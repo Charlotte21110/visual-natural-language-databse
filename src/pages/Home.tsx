@@ -1,40 +1,18 @@
 import { useState } from 'react';
-import { tcbCapiRequest, lowcodeCapiRequest } from '@/request';
+import { tcbCapiRequest, lowcodeCapiRequest, capiRequest } from '@/request';
 
-/**
- * 首页 - 接口测试面板
- */
 export default function Home() {
   const [result, setResult] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
 
-  // 示例：调用 TCB 服务的 DescribeEnvs
-  const testTcbApi = async () => {
+  const runRequest = async (name: string, fn: () => Promise<any>) => {
     setLoading(true);
     setError('');
+    setResult('');
     try {
-      const res = await tcbCapiRequest({
-        action: 'DescribeEnvs',
-        data: {},
-      });
-      setResult(JSON.stringify(res, null, 2));
-    } catch (err: any) {
-      setError(err.message || JSON.stringify(err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 示例：调用 lowcode 服务
-  const testLowcodeApi = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await lowcodeCapiRequest({
-        action: 'DescribeApplication',
-        data: {},
-      });
+      console.log(`[请求] ${name}...`);
+      const res = await fn();
       setResult(JSON.stringify(res, null, 2));
     } catch (err: any) {
       setError(err.message || JSON.stringify(err));
@@ -47,43 +25,76 @@ export default function Home() {
     <div style={{ padding: 24, maxWidth: 960, margin: '0 auto' }}>
       <h1 style={{ marginBottom: 8 }}>Natural Language DB</h1>
       <p style={{ color: '#666', marginBottom: 24 }}>
-        接口调试面板 - 请确保已在浏览器登录过{' '}
-        <a href="https://weda-api.cloud.tencent.com" target="_blank" rel="noreferrer">
-          微搭控制台
-        </a>
+        接口调试面板 - 登录态已通过 LoginGuard 验证
       </p>
 
-      <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
         <button
-          onClick={testTcbApi}
+          onClick={() =>
+            runRequest('TCB/DescribeEnvs', () =>
+              tcbCapiRequest({ action: 'DescribeEnvs', data: {} }),
+            )
+          }
           disabled={loading}
-          style={{
-            padding: '8px 16px',
-            background: '#1677ff',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 6,
-            cursor: loading ? 'not-allowed' : 'pointer',
-          }}
+          style={btnStyle('#1677ff', loading)}
         >
-          {loading ? '请求中...' : '测试 TCB: DescribeEnvs'}
+          TCB: DescribeEnvs
         </button>
 
         <button
-          onClick={testLowcodeApi}
+          onClick={() =>
+            runRequest('Lowcode/DescribeApplication', () =>
+              lowcodeCapiRequest({ action: 'DescribeApplication', data: {} }),
+            )
+          }
           disabled={loading}
-          style={{
-            padding: '8px 16px',
-            background: '#52c41a',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 6,
-            cursor: loading ? 'not-allowed' : 'pointer',
-          }}
+          style={btnStyle('#52c41a', loading)}
         >
-          {loading ? '请求中...' : '测试 Lowcode: DescribeApplication'}
+          Lowcode: DescribeApplication
+        </button>
+
+        <button
+          onClick={() =>
+            runRequest('Account/DescribeCurrentUserDetails', () =>
+              capiRequest({ serviceType: 'account', action: 'DescribeCurrentUserDetails', data: {} }),
+            )
+          }
+          disabled={loading}
+          style={btnStyle('#722ed1', loading)}
+        >
+          Account: 用户详情
+        </button>
+
+        <button
+          onClick={() =>
+            runRequest('TCB/DescribeEnvBacklogs', () =>
+              tcbCapiRequest({
+                action: 'DescribeEnvBacklogs',
+                data: { EnvId: 'marisa-dev-com-6g6urdyj6abb73ce' },
+                extra: { region: 'ap-shanghai' },
+              }),
+            )
+          }
+          disabled={loading}
+          style={btnStyle('#fa8c16', loading)}
+        >
+          TCB: DescribeEnvBacklogs
         </button>
       </div>
+
+      {loading && (
+        <div
+          style={{
+            padding: 16,
+            background: '#e6f7ff',
+            border: '1px solid #91d5ff',
+            borderRadius: 6,
+            marginBottom: 16,
+          }}
+        >
+          请求中...
+        </div>
+      )}
 
       {error && (
         <div
@@ -128,4 +139,17 @@ export default function Home() {
       )}
     </div>
   );
+}
+
+function btnStyle(bg: string, loading: boolean): React.CSSProperties {
+  return {
+    padding: '8px 16px',
+    background: bg,
+    color: '#fff',
+    border: 'none',
+    borderRadius: 6,
+    cursor: loading ? 'not-allowed' : 'pointer',
+    opacity: loading ? 0.6 : 1,
+    fontSize: 14,
+  };
 }
