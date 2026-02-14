@@ -1,29 +1,36 @@
 @import 'tea-component/dist/tea.css';
 
-// 薄荷绿主题配置
-@brand-color: #4ade80; // 主色调
-@brand-color-hover: #3ddc76; // 主色调hover
-@brand-color-active: #2db866; // 主色调active
-@brand-color-disabled: #a7e0c0; // 主色调disabled
+// ============================================
+// 主题变量配置
+// ============================================
+
+// 主色调
+@brand-color: #6aaf9a;
+@brand-color-hover: #5a9f8a;
+@brand-color-active: #e6efed;
+@brand-color-disabled: #a5cfc2;
 
 // 背景色
-@bg-color: #f8fafc;
+@bg-color: #f6f9f7;
 @bg-color-light: #ffffff;
-@bg-color-secondary: #f1f5f9;
+@bg-color-secondary: #f0f4f2;
+
+// 气泡/卡片色
+@bubble-color: #dfece8;
 
 // 文字颜色
 @text-primary-color: #1e293b;
-@text-secondary-color: #64748b;
+@text-secondary-color: #78b6a4;
 @text-tertiary-color: #94a3b8;
 
 // 边框颜色
 @border-color: #e2e8f0;
-@border-color-light: #f1f5f9;
+@border-color-light: #e6efed;
 @border-color-strong: #cbd5e1;
 
 // 阴影
 @shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
-@shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+@shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
 @shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 
 // 圆角
@@ -34,7 +41,9 @@
 // 字体
 @font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 
-// 全局样式覆盖
+// ============================================
+// 全局样式
+// ============================================
 body {
   font-family: @font-family;
   background-color: @bg-color;
@@ -42,7 +51,7 @@ body {
   padding: 0;
 }
 
-// 自定义主题变量
+// CSS 变量（供组件库使用）
 :root {
   --tea-brand-color: @brand-color;
   --tea-brand-color-hover: @brand-color-hover;
@@ -55,476 +64,168 @@ body {
   --tea-border-color: @border-color;
 }
 
-// 登录页面样式
-.login-container {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  
-  .login-content {
-    display: flex;
-    width: 100%;
-    max-width: 1200px;
-    height: 600px;
-    border-radius: 12px;
-    overflow: hidden;
-    
-    .login-left {
-      flex: 1;
-      background: linear-gradient(135deg, #4ade80, #22c55e);
-      color: white;
-      padding: 48px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      
-      .logo {
-        display: flex;
-        align-items: center;
-        margin-bottom: 24px;
-        
-        .logo-icon {
-          width: 48px;
-          height: 48px;
-          background: white;
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-right: 16px;
-        }
-      }
-      
-      h1 {
-        font-size: 32px;
-        font-weight: 600;
-        margin-bottom: 16px;
-      }
-      
-      h2 {
-        font-size: 20px;
-        opacity: 0.9;
-        margin-bottom: 32px;
-      }
-      
-      p {
-        font-size: 16px;
-        opacity: 0.8;
-        margin-bottom: 40px;
-        line-height: 1.6;
-      }
-      
-      .database-buttons {
-        display: flex;
-        gap: 16px;
-        
-        .db-btn {
-          padding: 12px 24px;
-          background: rgba(255, 255, 255, 0.2);
-          border: 1px solid rgba(255, 255, 255, 0.3);
-          border-radius: 8px;
-          color: white;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          font-size: 16px;
-          
-          &:hover {
-            background: rgba(255, 255, 255, 0.3);
-          }
-        }
-      }
-    }
-    
-    .login-right {
-      flex: 1;
-      background: white;
-      padding: 48px;
-      
-      .login-form {
-        width: 100%;
-        max-width: 400px;
-        
-        .login-header {
-          text-align: center;
-          margin-bottom: 32px;
-          
-          .tabs {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 32px;
-            
-            .tab {
-              padding: 8px 24px;
-              cursor: pointer;
-              border-radius: 8px;
-              font-weight: 500;
-              
-              &:first-child {
-                margin-right: 16px;
-                background: @brand-color;
-                color: white;
-              }
-              
-              &:last-child {
-                background: transparent;
-                color: @text-secondary-color;
-              }
-            }
-          }
-        }
-        
-        .form-group {
-          margin-bottom: 24px;
-          
-          .form-item {
-            margin-bottom: 16px;
-          }
-          
-          .form-label {
-            font-weight: 500;
-            color: @text-primary-color;
-            margin-bottom: 8px;
-            display: block;
-          }
-          
-          .form-input {
-            width: 100%;
-            padding: 12px 16px;
-            border: 1px solid @border-color;
-            border-radius: 8px;
-            font-size: 16px;
-            
-            &:focus {
-              outline: none;
-              border-color: @brand-color;
-              box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.2);
-            }
-          }
-          
-          .login-button {
-            width: 100%;
-            padding: 12px;
-            background: @brand-color;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 500;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            transition: all 0.3s ease;
-            
-            &:hover {
-              background: @brand-color-hover;
-            }
-            
-            &:active {
-              background: @brand-color-active;
-            }
-          }
-        }
-      }
-    }
+// ============================================
+// 公共组件样式覆盖
+// ============================================
+
+// 所有按钮基础样式
+.tea-btn {
+  border-radius: @border-radius !important;
+  transition: all 0.2s ease !important;
+}
+
+// 主要按钮 (Primary) - 使用更高优先级选择器
+.tea-btn.tea-btn--primary,
+button.tea-btn--primary,
+.tea-btn--primary {
+  background-color: @brand-color !important;
+  border-color: @brand-color !important;
+  color: white !important;
+
+  &:hover {
+    background-color: @brand-color-hover !important;
+    border-color: @brand-color-hover !important;
+  }
+
+  &:active, &:focus {
+    background-color: @brand-color-hover !important;
+    border-color: @brand-color-hover !important;
+    box-shadow: 0 0 0 2px fade(@brand-color, 25%) !important;
+  }
+
+  &:disabled, &.is-disabled {
+    background-color: @brand-color-disabled !important;
+    border-color: @brand-color-disabled !important;
+    cursor: not-allowed !important;
   }
 }
 
-// 主页面布局样式
-.main-layout {
-  display: flex;
-  height: 100vh;
-  
-  .sidebar {
-    width: 220px;
-    background: @bg-color-light;
-    border-right: 1px solid @border-color;
-    padding: 24px 0;
-    
-    .sidebar-header {
-      padding: 0 24px 24px;
-      border-bottom: 1px solid @border-color-light;
-    }
-    
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-size: 20px;
-      font-weight: 600;
-      color: @text-primary-color;
-      
-      .logo-icon {
-        width: 32px;
-        height: 32px;
-        background: @brand-color;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-      }
-    }
-    
-    .menu {
-      margin-top: 32px;
-      
-      .menu-item {
-        padding: 12px 24px;
-        cursor: pointer;
-        color: @text-secondary-color;
-        transition: all 0.3s ease;
-        
-        &:hover {
-          background: @border-color-light;
-          color: @text-primary-color;
-        }
-        
-        &.active {
-          background: @border-color-light;
-          color: @brand-color;
-          font-weight: 500;
-        }
-        
-        .menu-icon {
-          margin-right: 12px;
-        }
-      }
-    }
-  }
-  
-  .main-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    
-    .header {
-      padding: 16px 24px;
-      background: @bg-color-light;
-      border-bottom: 1px solid @border-color;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      
-      .header-left {
-        display: flex;
-        gap: 24px;
-        align-items: center;
-        
-        .header-tabs {
-          display: flex;
-          gap: 8px;
-          
-          .tab {
-            padding: 8px 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            
-            &.active {
-              background: @brand-color;
-              color: white;
-            }
-            
-            &.default {
-              background: transparent;
-              color: @text-secondary-color;
-              
-              &:hover {
-                background: @border-color-light;
-              }
-            }
-          }
-        }
-      }
-      
-      .header-right {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        
-        .user-info {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          cursor: pointer;
-          
-          .user-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: @brand-color;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-        }
-      }
-    }
-    
-    .content {
-      flex: 1;
-      display: flex;
-      overflow: hidden;
-      
-      .chat-area {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        padding: 24px;
-        background: @bg-color;
-        
-        .chat-messages {
-          flex: 1;
-          overflow-y: auto;
-          padding: 16px;
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-        
-        .chat-input {
-          margin-top: 24px;
-          padding: 0 16px;
-          
-          .input-container {
-            display: flex;
-            gap: 12px;
-            
-            .input-field {
-              flex: 1;
-              padding: 12px 16px;
-              border: 1px solid @border-color;
-              border-radius: 8px;
-              font-size: 14px;
-              
-              &:focus {
-                outline: none;
-                border-color: @brand-color;
-              }
-            }
-            
-            .send-button {
-              width: 48px;
-              height: 48px;
-              border-radius: 50%;
-              background: @brand-color;
-              color: white;
-              border: none;
-              cursor: pointer;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              
-              &:hover {
-                background: @brand-color-hover;
-              }
-            }
-          }
-        }
-      }
-      
-      .data-panel {
-        width: 400px;
-        border-left: 1px solid @border-color;
-        background: @bg-color-light;
-        
-        .panel-header {
-          padding: 16px;
-          border-bottom: 1px solid @border-color;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          
-          .panel-title {
-            font-weight: 500;
-            color: @text-primary-color;
-          }
-          
-          .panel-actions {
-            display: flex;
-            gap: 8px;
-          }
-        }
-        
-        .panel-content {
-          padding: 16px;
-          height: calc(100% - 56px);
-          overflow-y: auto;
-          
-          .data-table {
-            width: 100%;
-            
-            .table-header {
-              display: flex;
-              gap: 8px;
-              margin-bottom: 16px;
-              
-              .table-tabs {
-                display: flex;
-                gap: 8px;
-                
-                .tab {
-                  padding: 8px 12px;
-                  border-radius: 6px;
-                  font-size: 12px;
-                  font-weight: 500;
-                  
-                  &.active {
-                    background: @brand-color;
-                    color: white;
-                  }
-                  
-                  &.default {
-                    background: @border-color-light;
-                    color: @text-secondary-color;
-                  }
-                }
-              }
-            }
-            
-            .table-container {
-              overflow: auto;
-              
-              .tea-table {
-                width: 100%;
-                border-collapse: collapse;
-                
-                th, td {
-                  padding: 12px;
-                  text-align: left;
-                  font-size: 14px;
-                }
-                
-                th {
-                  background: @bg-color-secondary;
-                  font-weight: 500;
-                  color: @text-primary-color;
-                }
-                
-                tr {
-                  &:nth-child(even) {
-                    background: @bg-color-light;
-                  }
-                }
-                
-                td {
-                  color: @text-secondary-color;
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+// 确保 query-btn 也使用绿色主题
+.query-btn.tea-btn--primary,
+.query-btn {
+  background-color: @brand-color !important;
+  border-color: @brand-color !important;
+
+  &:hover {
+    background-color: @brand-color-hover !important;
+    border-color: @brand-color-hover !important;
   }
 }
 
-// 加载动画样式
+// 弱按钮 (Weak)
+.tea-btn--weak {
+  color: @text-primary-color !important;
+  border-color: @border-color !important;
+  background-color: white !important;
+
+  &:hover {
+    color: @brand-color !important;
+    border-color: @brand-color !important;
+    background-color: @brand-color-active !important;
+  }
+
+  &:active, &:focus {
+    color: @brand-color !important;
+    border-color: @brand-color !important;
+    box-shadow: 0 0 0 2px fade(@brand-color, 15%) !important;
+  }
+}
+
+// 链接按钮 (Link)
+.tea-btn--link {
+  color: @brand-color !important;
+
+  &:hover {
+    color: @brand-color-hover !important;
+  }
+}
+
+// 危险按钮保持红色
+.tea-btn--danger {
+  &:hover {
+    border-color: #ef4444 !important;
+  }
+}
+
+// 按钮尺寸圆角
+.tea-btn--s {
+  border-radius: @border-radius-sm !important;
+}
+
+.tea-btn--l {
+  border-radius: @border-radius !important;
+}
+
+// 输入框样式
+.tea-input {
+  border-radius: @border-radius !important;
+  border-color: @border-color !important;
+  transition: all 0.2s ease !important;
+
+  &:focus, &:hover {
+    border-color: @brand-color !important;
+  }
+
+  &:focus {
+    box-shadow: 0 0 0 2px fade(@brand-color, 15%) !important;
+  }
+}
+
+.tea-textarea {
+  border-radius: @border-radius !important;
+  border-color: @border-color !important;
+
+  &:focus, &:hover {
+    border-color: @brand-color !important;
+  }
+
+  &:focus {
+    box-shadow: 0 0 0 2px fade(@brand-color, 15%) !important;
+  }
+}
+
+// 选择框样式
+.tea-select__input {
+  border-radius: @border-radius !important;
+  border-color: @border-color !important;
+
+  &:hover {
+    border-color: @brand-color !important;
+  }
+}
+
+.tea-select--focused .tea-select__input {
+  border-color: @brand-color !important;
+  box-shadow: 0 0 0 2px fade(@brand-color, 15%) !important;
+}
+
+// 复选框和单选框
+.tea-checkbox__input:checked,
+.tea-radio__input:checked {
+  background-color: @brand-color !important;
+  border-color: @brand-color !important;
+}
+
+// 开关样式
+.tea-switch--on {
+  background-color: @brand-color !important;
+}
+
+// 标签页
+.tea-tabs__item--active {
+  color: @brand-color !important;
+  border-color: @brand-color !important;
+}
+
+// 分页
+.tea-pagination__item--current {
+  background-color: @brand-color !important;
+  border-color: @brand-color !important;
+}
+
+// ============================================
+// 加载动画
+// ============================================
 .spin-container {
   display: flex;
   justify-content: center;
@@ -534,57 +235,13 @@ body {
 .spin-loader {
   width: 40px;
   height: 40px;
-  border: 3px solid rgba(74, 222, 128, 0.3);
+  border: 3px solid fade(@brand-color, 30%);
   border-radius: 50%;
-  border-top: 3px solid @brand-color;
+  border-top-color: @brand-color;
   animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
-}
-
-// 卡片样式补充
-.card {
-  background-color: @bg-color-light;
-  border-radius: @border-radius;
-  box-shadow: @shadow-sm;
-  border: 1px solid @border-color;
-  margin-bottom: 16px;
-  overflow: hidden;
-  
-  .card-header {
-    padding: 16px;
-    border-bottom: 1px solid @border-color;
-    font-weight: 500;
-    color: @text-primary-color;
-    display: flex;
-    align-items: center;
-  }
-  
-  .card-content {
-    padding: 16px;
-    
-    p {
-      margin: 0 0 12px 0;
-      color: @text-secondary-color;
-      line-height: 1.6;
-    }
-  }
-}
-
-// 数据库树形结构
-.database-tree {
-  font-size: 14px;
-  color: @text-secondary-color;
-}
-
-// 分页信息
-.pagination {
-  margin-top: 16px;
-  padding: 12px;
-  text-align: center;
-  color: @text-tertiary-color;
-  font-size: 13px;
 }

@@ -1,0 +1,50 @@
+@import '../../styles/tea-theme.less';
+
+// ============================================
+// 主布局样式
+// ============================================
+.main-layout {
+  display: flex;
+  height: 100vh;
+  background: @bg-color;
+}
+
+// ============================================
+// 主内容区
+// ============================================
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  .content {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+}
+
+// ============================================
+// 占位页面
+// ============================================
+.page-placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: @text-tertiary-color;
+
+  h2 {
+    font-size: 20px;
+    font-weight: 500;
+    color: @text-primary-color;
+    margin: 0 0 8px 0;
+  }
+
+  p {
+    font-size: 14px;
+    margin: 0;
+  }
+}
