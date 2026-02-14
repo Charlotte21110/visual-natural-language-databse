@@ -71,3 +71,28 @@ export default defineConfig([
   },
 ])
 ```
+
+# cookie复制
+
+``` js
+copy(JSON.stringify(
+  document.cookie.split('; ').map(c => {
+    const [name, ...v] = c.split('=');
+    return {
+      name,
+      value: v.join('='),
+      domain: '.cloud.tencent.com',
+      path: '/',
+      expires: -1,
+      httpOnly: false,
+      secure: true,
+      sameSite: 'Lax'
+    };
+  }),
+  null,
+  2
+));
+
+console.log('✅ 已复制到剪贴板！直接粘贴给 AI 即可');
+console.log('📊 共导出 ' + document.cookie.split('; ').length + ' 个 cookies');
+```

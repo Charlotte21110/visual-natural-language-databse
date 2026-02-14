@@ -4,19 +4,18 @@
  * 对应 dev-platform: src/framework/request/capi/call-capi/call-capi.ts
  *
  * 核心逻辑：
- * 1. 通过 credentials: 'include' 携带 Cookie（鉴权依赖）
- * 2. 请求头带上 X-Qcloud-Token（从响应头缓存）
- * 3. 请求头带上 X-CsrfCode（CSRF 防护）
- * 4. 请求头带上 X-Req-Id（请求追踪）
+ * 1. Cookie 由 Vite 代理服务器注入（从 .env.local 中读取）
+ * 2. 前端带上 X-Qcloud-Token（从响应头缓存）
+ * 3. 前端带上 X-CsrfCode（从 .env.local Cookie 中解析 skey 计算）
+ * 4. 前端带上 X-Req-Id（请求追踪）
  */
 import { randomUUID } from '../utils/uuid';
 import { generateAntiCsrfCode } from '../utils/csrf';
-import type { ECapiServiceType } from '../constants';
 
 // ==================== 类型定义 ====================
 
 export interface ICallCapiParams {
-  serviceType: ECapiServiceType | string;
+  serviceType: string;
   actionName: string;
   actionParam?: Record<string, any>;
   region?: string;
@@ -25,7 +24,7 @@ export interface ICallCapiParams {
 
 export interface ICapiRequestParams {
   /** 服务类型 */
-  serviceType: ECapiServiceType | string;
+  serviceType: string;
   /** 接口名称 */
   action: string;
   /** 接口入参 */
@@ -56,16 +55,10 @@ interface ICallCapiResult {
 
 let cachedQcloudToken = '';
 
-/**
- * 手动设置 qcloud token（如果需要从外部注入）
- */
 export function setQcloudToken(token: string) {
   cachedQcloudToken = token;
 }
 
-/**
- * 获取当前缓存的 qcloud token
- */
 export function getQcloudToken(): string {
   return cachedQcloudToken;
 }
@@ -82,8 +75,14 @@ const TCB_SOURCE = 'naturalLanguageDb/dev';
 
 // ==================== 判断请求结果 ====================
 
+/** 默认地域 */
+const DEFAULT_REGION = 'ap-shanghai';
+
+/** 成功响应码 */
+const SUCCESS_CODE = 'NORMAL';
+
 function isFailureResult(result: ICallCapiResult): boolean {
-  return result.code !== 0 && result.code !== '0';
+  return result.code !== SUCCESS_CODE && result.code !== 0 && result.code !== '0';
 }
 
 // ==================== 错误类 ====================
@@ -113,6 +112,9 @@ export class ApiCallError extends Error {
  * CAPI 底层 fetch 请求
  *
  * 对应 dev-platform 的 callCapi 函数
+ *
+ * 注意：Cookie 不由前端 fetch 携带，而是由 Vite 代理注入。
+ * 前端只负责带 X-Qcloud-Token / X-CsrfCode / X-Req-Id 等自定义头。
  */
 async function callCapi(
   endpoint: string,
@@ -120,6 +122,14 @@ async function callCapi(
   opts?: { signal?: AbortSignal },
 ): Promise<any> {
   const apiIdentifier = [params.serviceType, params.actionName].join('/');
+  const csrfCode = generateAntiCsrfCode();
+
+  console.log('[CAPI DEBUG] 请求:', {
+    endpoint,
+    action: params.actionName,
+    csrfCode: csrfCode ? `${csrfCode.substring(0, 6)}...` : 'empty!',
+    token: cachedQcloudToken ? `${cachedQcloudToken.substring(0, 10)}...` : 'empty',
+  });
 
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -132,7 +142,6 @@ async function callCapi(
       [X_CSRF_CODE]: generateAntiCsrfCode(),
       [X_TC_LANGUAGE]: 'zh-CN',
     },
-    credentials: 'include',
     body: JSON.stringify({
       raw: true,
       actionParam: {},
@@ -150,12 +159,19 @@ async function callCapi(
     });
   }
 
-  // 从响应头缓存 token（后端会在响应头返回新 token）
-  if (response.headers.has(X_QCLOUD_TOKEN)) {
-    cachedQcloudToken = response.headers.get(X_QCLOUD_TOKEN) || '';
+  // 从响应头缓存 token
+  const newToken = response.headers.get(X_QCLOUD_TOKEN) || response.headers.get('x-qcloud-token');
+  if (newToken) {
+    cachedQcloudToken = newToken;
   }
 
   const callResult = (await response.json()) as ICallCapiResult;
+
+  console.log('[CAPI DEBUG] 响应:', {
+    code: callResult.code,
+    msg: callResult.msg?.substring(0, 100),
+    hasToken: !!response.headers.get(X_QCLOUD_TOKEN),
+  });
 
   if (isFailureResult(callResult)) {
     const { code, reqId, msg, result } = callResult;
@@ -176,12 +192,10 @@ async function callCapi(
 /**
  * 发起 CAPI 请求
  *
- * 对应 dev-platform 的 capiRequest 函数
- *
  * @example
  * ```ts
  * const result = await capiRequest({
- *   serviceType: ECapiServiceType.TCB,
+ *   serviceType: 'tcb',
  *   action: 'RunSql',
  *   data: { EnvId: 'xxx', Sql: 'SELECT 1' },
  * });
@@ -196,6 +210,7 @@ export async function capiRequest<TData = any>(
   const endpoint = `/weda-capi/qcloud-weida/v1/capi?i=${apiIdentifier}`;
 
   const callCapiParams: ICallCapiParams = {
+    region: DEFAULT_REGION,
     ...extra,
     serviceType,
     actionName: action,
@@ -209,7 +224,13 @@ export async function capiRequest<TData = any>(
     if (err instanceof ApiCallError) {
       const isLoginFailed = ['VERIFY_LOGIN_FAILED', 'VERIFY_USER_FAILED'].includes(err.code);
       if (isLoginFailed) {
-        console.error('[CAPI] 登录态失效，请在浏览器重新登录 dev-platform');
+        console.error(
+          '[CAPI] 登录态失效！请按以下步骤操作：\n' +
+          '1. 浏览器访问 https://tcb.cloud.tencent.com/login 登录\n' +
+          '2. 登录后 F12 -> Application -> Cookies -> cloud.tencent.com\n' +
+          '3. 复制完整 Cookie 到 .env.local 的 VITE_TCLOUD_COOKIE 中\n' +
+          '4. 重启 dev server (npm run dev)',
+        );
       }
     }
     throw err;
