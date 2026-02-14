@@ -1,0 +1,111 @@
+@import '../../styles/tea-theme.less';
+
+.chat-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: @bg-color;
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+}
+
+// 气泡式聊天消息
+.chat-bubble {
+  display: flex;
+  max-width: 75%;
+
+  &.ai {
+    align-self: flex-start;
+
+    .bubble-content {
+      background: @bubble-color;
+      border-radius: 16px 16px 16px 4px;
+    }
+  }
+
+  &.user {
+    align-self: flex-end;
+
+    .bubble-content {
+      background: white;
+      border-radius: 16px 16px 4px 16px;
+      border: 1px solid @border-color;
+    }
+  }
+
+  .bubble-content {
+    padding: 14px 18px;
+
+    p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.6;
+      color: @text-primary-color;
+    }
+
+    .query-btn {
+      margin-top: 12px;
+    }
+  }
+}
+
+// 聊天输入框
+.chat-input {
+  padding: 16px 24px 24px;
+
+  .input-container {
+    display: flex;
+    align-items: center;
+    background: white;
+    border: 1px solid @border-color;
+    border-radius: 24px;
+    padding: 8px 8px 8px 20px;
+    box-shadow: @shadow-sm;
+
+    .tea-input-container {
+      flex: 1;
+
+      .tea-input {
+        border: none;
+        background: transparent;
+
+        &:focus {
+          box-shadow: none;
+        }
+      }
+    }
+
+    .input-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      .send-btn {
+        width: 40px;
+        height: 40px;
+        border: none;
+        background: @brand-color;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        transition: all 0.2s ease;
+
+        &:hover {
+          background: @brand-color-hover;
+          transform: scale(1.05);
+        }
+      }
+    }
+  }
+}
+
