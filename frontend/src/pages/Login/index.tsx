@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Input, message } from 'tea-component';
+import { Button, Input, message, notification } from 'tea-component';
 import { useAuth } from '../../hooks/useAuth';
 import './style.less';
 
@@ -8,22 +8,49 @@ const Login = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const { login } = useAuth();
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!cookieValue.trim()) {
-      alert('请输入 Cookie');
+      message.error({ content: '请输入 Cookie' });
       return;
     }
 
     try {
+      // 解析 Cookie JSON
       const cookieArray = JSON.parse(cookieValue);
-      if (Array.isArray(cookieArray)) {
+      if (!Array.isArray(cookieArray)) {
+        message.error({ content: 'Cookie 格式错误，请输入 JSON 数组格式' });
+        return;
+      }
+
+      // 转换成 Cookie 字符串格式 (name=value; name2=value2)
+      const cookieString = cookieArray
+        .map(c => `${c.name}=${c.value}`)
+        .join('; ');
+
+      // 发送给后端保存
+      // TODO marisa 封装下本地的后端接口啊
+      const response = await fetch('http://localhost:3001/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          cookie: cookieString,
+          envId: '' // 可选，如果后端 .env 没配置可以从这里传
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        message.success({ content: '登录成功！Cookie 已保存' });
+        // 保存到本地（用于显示登录状态）
         localStorage.setItem('cookieData', cookieValue);
         login('authenticated');
       } else {
-        alert('Cookie 格式错误，请输入 JSON 数组格式');
+        message.error({ content: result.message || '登录失败' });
       }
-    } catch (e) {
-      alert('Cookie 格式错误，请输入正确的 JSON 格式');
+    } catch (e: any) {
+      console.error('登录失败:', e);
+      message.error({ content: `登录失败: ${e.message}` });
     }
   };
 
