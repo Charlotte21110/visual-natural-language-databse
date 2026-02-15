@@ -21,7 +21,7 @@ const ChatArea = ({ onQuery }: ChatAreaProps) => {
     { id: 3, type: 'ai', content: '我已经为你查询了数据。请查看右侧面板中的结果。', showButton: true },
   ]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!inputValue.trim()) return;
     
     // 添加用户消息
@@ -33,19 +33,69 @@ const ChatArea = ({ onQuery }: ChatAreaProps) => {
     
     setMessages(prev => [...prev, userMsg]);
     
-    // 模拟 AI 回复
-    setTimeout(() => {
-      const aiMsg: ChatMessage = {
-        id: messages.length + 2,
-        type: 'ai',
-        content: '我已经为你查询了数据。请查看右侧面板中的结果。',
-        showButton: true,
-      };
-      setMessages(prev => [...prev, aiMsg]);
-    }, 500);
+    const userInput = inputValue;
+    setInputValue(''); // 清空输入框
     
-    onQuery?.(inputValue);
-    setInputValue('');
+    // 添加加载提示
+    const loadingMsg: ChatMessage = {
+      id: messages.length + 2,
+      type: 'ai',
+      content: '正在处理您的请求...',
+    };
+    setMessages(prev => [...prev, loadingMsg]);
+    
+    try {
+      // 调用后端 API
+      const response = await fetch('http://localhost:3001/api/chat/query', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: userInput,
+          context: {}, // 可以传递上下文信息
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      // 移除加载消息，添加实际响应
+      setMessages(prev => {
+        const filtered = prev.filter(msg => msg.id !== loadingMsg.id);
+        const aiMsg: ChatMessage = {
+          id: Date.now(),
+          type: 'ai',
+          content: result.message || '已为您处理完成',
+          showButton: result.type === 'query_result',
+        };
+        return [...filtered, aiMsg];
+      });
+      
+      // 如果有查询结果，触发 onQuery 回调
+      if (result.type === 'query_result' && result.data) {
+        onQuery?.(userInput);
+        // 可以在这里处理数据展示
+        console.log('[查询结果]', result);
+      }
+      
+    } catch (error: any) {
+      console.error('[API Error]', error);
+      
+      // 移除加载消息，显示错误
+      setMessages(prev => {
+        const filtered = prev.filter(msg => msg.id !== loadingMsg.id);
+        const errorMsg: ChatMessage = {
+          id: Date.now(),
+          type: 'ai',
+          content: `抱歉，处理请求时出错了：${error.message}。请检查后端服务是否启动。`,
+        };
+        return [...filtered, errorMsg];
+      });
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
