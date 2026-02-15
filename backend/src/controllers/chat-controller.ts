@@ -22,7 +22,11 @@ export async function handleChatQuery(req: Request, res: Response) {
       });
     }
 
-    console.log('[Chat Query]', { message, hasContext: !!context });
+    console.log('\n========================================');
+    console.log('[Chat Query] 收到请求');
+    console.log('  用户输入:', message);
+    console.log('  上下文:', context || '无');
+    console.log('========================================\n');
 
     // 1. 补充上下文（历史会话、用户信息等）
     const enrichedContext = await contextManager.enrichContext(context);

@@ -3,13 +3,13 @@
  * 负责查询和展示数据库数据
  */
 import { AgentResponse } from '../services/agent-router.js';
-import { CloudBaseClient } from '../clients/cloudbase-client.js';
+import { getCloudBaseClient } from '../clients/cloudbase-client.js';
 
 export class DataExplorerAgent {
-  private cloudbase: CloudBaseClient;
+  private cloudbase = getCloudBaseClient();
 
   constructor() {
-    this.cloudbase = new CloudBaseClient();
+    // 使用全局单例
   }
 
   async execute(
@@ -84,9 +84,22 @@ export class DataExplorerAgent {
 
     // 获取数据（默认限制 100 条）
     const limit = context.limit || 100;
-    const data = await this.cloudbase.queryCollection(envId, collectionName, {
-      limit,
-    });
+    const skip = context.skip || 0;
+
+    // 构建查询选项
+    const options: any = { limit, skip };
+
+    // 如果有筛选条件
+    if (context.where) {
+      options.where = context.where;
+    }
+
+    // 如果有排序
+    if (context.orderBy) {
+      options.orderBy = context.orderBy;
+    }
+
+    const data = await this.cloudbase.queryCollection(collectionName, options);
 
     return {
       dbType: 'flexdb',
@@ -98,6 +111,9 @@ export class DataExplorerAgent {
 
   /**
    * 查询 MySQL
+   * 
+   * ⚠️ 注意：@cloudbase/node-sdk 主要支持 FlexDB (MongoDB)
+   * MySQL 查询需要使用云函数或 CAPI 接口
    */
   private async queryMySQL(
     envId: string,
@@ -107,19 +123,11 @@ export class DataExplorerAgent {
   ) {
     console.log(`[DataExplorerAgent] Querying MySQL: ${database}.${table}`);
 
-    // 构建 SQL（默认查询前 100 条）
-    const limit = context.limit || 100;
-    const sql = `SELECT * FROM \`${table}\` LIMIT ${limit}`;
-
-    const data = await this.cloudbase.executeSQL(envId, database, sql);
-
-    return {
-      dbType: 'mysql',
-      database,
-      table,
-      data,
-      count: data.length,
-    };
+    // TODO: 实现 MySQL 查询
+    // 方案 1: 通过云函数查询
+    // 方案 2: 通过 CAPI 调用 flexdb 的 RunSql 接口
+    
+    throw new Error('MySQL 查询功能开发中，请先使用 FlexDB');
   }
 
   /**
