@@ -1,0 +1,175 @@
+/**
+ * ChatArea 组件（对接后端 API 版本）
+ * 
+ * 使用方式：
+ * 1. 将此文件重命名为 index.tsx
+ * 2. 确保后端服务已启动（http://localhost:3001）
+ * 3. 在 .env 中配置 TCB_ENV_ID
+ */
+import { useState } from 'react';
+import { Button, Input, message as toast } from 'tea-component';
+import { queryChatAPI, ChatQueryResponse } from '../../api/chat-api';
+import './style.less';
+
+interface ChatMessage {
+  id: number;
+  type: 'user' | 'ai';
+  content: string;
+  data?: any;
+  metadata?: any;
+  suggestions?: string[];
+}
+
+interface ChatAreaProps {
+  onQuery?: (response: ChatQueryResponse) => void;
+}
+
+const ChatArea = ({ onQuery }: ChatAreaProps) => {
+  const [inputValue, setInputValue] = useState('');
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: 1,
+      type: 'ai',
+      content: '你好！我是 QueryFlow 助手。请用自然语言描述你想要查询的数据，例如："查询 flexdb 的 users 表" 或 "如何连接 MongoDB"。',
+    },
+  ]);
+  const [loading, setLoading] = useState(false);
+
+  const handleSend = async () => {
+    if (!inputValue.trim()) return;
+
+    // 添加用户消息
+    const userMsg: ChatMessage = {
+      id: Date.now(),
+      type: 'user',
+      content: inputValue,
+    };
+
+    setMessages((prev) => [...prev, userMsg]);
+    setInputValue('');
+    setLoading(true);
+
+    try {
+      // 调用后端 API
+      const response = await queryChatAPI({
+        message: inputValue,
+        context: {
+          // TODO: 从全局状态或配置中获取
+          envId: import.meta.env.VITE_TCB_ENV_ID || '',
+          sessionId: 'default',
+        },
+      });
+
+      console.log('[Chat Response]', response);
+
+      // 添加 AI 回复
+      const aiMsg: ChatMessage = {
+        id: Date.now() + 1,
+        type: 'ai',
+        content: response.message,
+        data: response.data,
+        metadata: response.metadata,
+        suggestions: response.suggestions,
+      };
+
+      setMessages((prev) => [...prev, aiMsg]);
+
+      // 通知父组件更新数据展示
+      onQuery?.(response);
+
+      // 如果是错误，显示提示
+      if (response.type === 'error') {
+        toast.error({ content: response.message });
+      }
+    } catch (error: any) {
+      console.error('[Chat Error]', error);
+
+      // 添加错误消息
+      const errorMsg: ChatMessage = {
+        id: Date.now() + 1,
+        type: 'ai',
+        content: `抱歉，处理请求时出错：${error.message}`,
+      };
+
+      setMessages((prev) => [...prev, errorMsg]);
+      toast.error({ content: '请求失败，请检查后端服务是否启动' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setInputValue(suggestion);
+  };
+
+  return (
+    <div className="chat-area">
+      <div className="chat-messages">
+        {messages.map((msg) => (
+          <div key={msg.id} className={`chat-bubble ${msg.type}`}>
+            <div className="bubble-content">
+              <p>{msg.content}</p>
+
+              {/* 显示建议按钮 */}
+              {msg.suggestions && msg.suggestions.length > 0 && (
+                <div className="suggestions">
+                  {msg.suggestions.map((suggestion, index) => (
+                    <Button
+                      key={index}
+                      type="weak"
+                      size="s"
+                      onClick={() => handleSuggestionClick(suggestion)}
+                    >
+                      {suggestion}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {/* 加载状态 */}
+        {loading && (
+          <div className="chat-bubble ai">
+            <div className="bubble-content">
+              <p>正在处理中...</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="chat-input">
+        <div className="input-container">
+          <Input
+            value={inputValue}
+            onChange={(value) => setInputValue(value)}
+            onKeyDown={handleKeyPress}
+            placeholder="输入自然语言查询，如：查询 flexdb 的 users 表..."
+            disabled={loading}
+          />
+          <div className="input-actions">
+            <button
+              className="send-btn"
+              onClick={handleSend}
+              disabled={loading || !inputValue.trim()}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ChatArea;

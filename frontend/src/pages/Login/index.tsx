@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Input } from 'tea-component';
+import { Button, Input, message } from 'tea-component';
 import { useAuth } from '../../hooks/useAuth';
 import './style.less';
 
@@ -109,6 +109,7 @@ console.log('共导出 ' + document.cookie.split('; ').length + ' 个 cookies');
                   <p>请先登录腾讯云控制台：</p>
                   <Button
                     type="primary"
+                    className="query-btn"
                     onClick={() => {
                       window.open('https://console.cloud.tencent.com', '_blank');
                       setCurrentStep(2);
@@ -128,14 +129,14 @@ console.log('共导出 ' + document.cookie.split('; ').length + ' 个 cookies');
                       type="link"
                       onClick={() => {
                         navigator.clipboard.writeText(scriptCode);
-                        alert('脚本已复制到剪贴板');
+                        notification.success({ content: '脚本已复制到剪贴板' });
                       }}
                     >
                       复制脚本
                     </Button>
                   </div>
                   <p className="tip">执行后 Cookie 会自动复制到剪贴板</p>
-                  <Button type="primary" onClick={() => setCurrentStep(3)}>
+                  <Button type="primary" className="query-btn" onClick={() => setCurrentStep(3)}>
                     下一步 →
                   </Button>
                 </div>
@@ -153,6 +154,7 @@ console.log('共导出 ' + document.cookie.split('; ').length + ' 个 cookies');
                   />
                   <Button
                     type="primary"
+                    className="query-btn"
                     style={{ width: '100%', marginTop: '16px' }}
                     onClick={handleLogin}
                   >

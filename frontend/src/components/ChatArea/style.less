@@ -68,11 +68,33 @@
     border-radius: 24px;
     padding: 8px 8px 8px 20px;
     box-shadow: @shadow-sm;
+    gap: 12px;
 
+    // 输入框容器 - 让 Input 组件铺满剩余宽度
+    > .tea-input,
+    .tea-input__container,
     .tea-input-container {
       flex: 1;
+      min-width: 0;
 
-      .tea-input {
+      .tea-input,
+      .tea-input__input {
+        width: 100%;
+        border: none;
+        background: transparent;
+
+        &:focus {
+          box-shadow: none;
+        }
+      }
+    }
+
+    // 处理 tea-input 组件的内部结构
+    .tea-input {
+      width: 100%;
+
+      input {
+        width: 100%;
         border: none;
         background: transparent;
 
@@ -85,7 +107,7 @@
     .input-actions {
       display: flex;
       align-items: center;
-      gap: 8px;
+      flex-shrink: 0;
 
       .send-btn {
         width: 40px;
