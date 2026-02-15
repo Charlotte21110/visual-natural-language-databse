@@ -1,0 +1,28 @@
+{
+  "name": "naturallanguagedb-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@langchain/community": "^0.3.20",
+    "@langchain/core": "^0.3.24",
+    "@langchain/openai": "^0.3.15",
+    "@tcb-manager/node": "^4.4.0",
+    "chromadb": "^1.9.3",
+    "express": "^4.21.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/cors": "^2.8.17",
+    "@types/node": "^20.11.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.0"
+  }
+}
