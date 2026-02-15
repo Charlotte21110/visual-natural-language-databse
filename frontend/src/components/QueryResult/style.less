@@ -63,7 +63,27 @@
 
 .result-body {
   flex: 1;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  // 美化滚动条
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: @bg-color-light;
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: @border-color;
+    border-radius: 4px;
+
+    &:hover {
+      background: @text-tertiary-color;
+    }
+  }
 }
 
 .table-wrapper {
@@ -108,10 +128,34 @@
 
 .result-footer {
   padding: 12px 0;
-  text-align: center;
   font-size: 12px;
   color: @text-tertiary-color;
   border-top: 1px solid @border-color-light;
   margin-top: 16px;
+
+  .result-count {
+    text-align: center;
+    margin-bottom: 12px;
+
+    span {
+      margin-left: 8px;
+    }
+  }
+
+  .result-suggestions {
+    margin-top: 12px;
+    
+    .suggestions-title {
+      font-size: 12px;
+      color: @text-secondary-color;
+      margin-bottom: 8px;
+    }
+
+    .suggestions-list {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+  }
 }
 

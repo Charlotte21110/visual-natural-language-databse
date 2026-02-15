@@ -4,12 +4,32 @@ import ChatArea from '../../components/ChatArea';
 import QueryResult from '../../components/QueryResult';
 import './style.less';
 
+interface QueryResultData {
+  type: string;
+  message: string;
+  data?: Array<Record<string, unknown>>;
+  metadata?: {
+    dbType?: string;
+    table?: string;
+    rowCount?: number;
+    columns?: string[];
+    displayType?: 'table' | 'document';
+  };
+  suggestions?: string[];
+}
+
 const MainLayout = () => {
   const [activeMenu, setActiveMenu] = useState('home');
+  const [queryResult, setQueryResult] = useState<QueryResultData | null>(null);
 
-  const handleQuery = (query: string) => {
-    console.log('Query:', query);
-    // TODO: 处理查询逻辑
+  const handleQuery = (result: QueryResultData) => {
+    console.log('Query result received:', result);
+    setQueryResult(result);
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    console.log('Suggestion clicked:', suggestion);
+    // TODO: 处理建议点击，可以自动填充到输入框
   };
 
   return (
@@ -25,7 +45,13 @@ const MainLayout = () => {
             <ChatArea onQuery={handleQuery} />
 
             {/* 右侧查询结果 */}
-            <QueryResult />
+            <QueryResult 
+              data={queryResult?.data}
+              metadata={queryResult?.metadata}
+              suggestions={queryResult?.suggestions}
+              message={queryResult?.message}
+              onSuggestionClick={handleSuggestionClick}
+            />
           </div>
         )}
 

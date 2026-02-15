@@ -9,8 +9,22 @@ interface ChatMessage {
   showButton?: boolean;
 }
 
+interface QueryResult {
+  type: string;
+  message: string;
+  data?: Array<Record<string, unknown>>;
+  metadata?: {
+    dbType?: string;
+    table?: string;
+    rowCount?: number;
+    columns?: string[];
+    displayType?: 'table' | 'document';
+  };
+  suggestions?: string[];
+}
+
 interface ChatAreaProps {
-  onQuery?: (query: string) => void;
+  onQuery?: (result: QueryResult) => void;
 }
 
 const ChatArea = ({ onQuery }: ChatAreaProps) => {
@@ -77,8 +91,7 @@ const ChatArea = ({ onQuery }: ChatAreaProps) => {
       
       // 如果有查询结果，触发 onQuery 回调
       if (result.type === 'query_result' && result.data) {
-        onQuery?.(userInput);
-        // 可以在这里处理数据展示
+        onQuery?.(result);
         console.log('[查询结果]', result);
       }
       
