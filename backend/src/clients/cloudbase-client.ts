@@ -23,7 +23,8 @@ export class CloudBaseClient {
     this.initialized = true;
     const secretId = process.env.TCB_SECRET_ID;
     const secretKey = process.env.TCB_SECRET_KEY;
-    const envId = process.env.TCB_ENV_ID;
+    // TODO 这个环境id是前端传过来的，识别出来给的啊，用户输入的
+    // const envId = process.env.TCB_ENV_ID;
 
     if (!secretId || !secretKey) {
       console.warn('[CloudBase] 未配置腾讯云密钥，部分功能将不可用');
