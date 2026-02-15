@@ -31,17 +31,24 @@ export interface IntentResult {
 }
 
 export class IntentClassifier {
-  private llm: ChatOpenAI;
+  private llm: ChatOpenAI | null = null;
 
   constructor() {
-    this.llm = new ChatOpenAI({
-      modelName: process.env.LLM_MODEL || 'qwen-plus',
-      temperature: 0.1,
-      configuration: {
-        baseURL: process.env.LLM_BASE_URL,
-        apiKey: process.env.LLM_API_KEY,
-      },
-    });
+    // 懒加载，只在第一次使用时初始化
+  }
+
+  private getLLM(): ChatOpenAI {
+    if (!this.llm) {
+      this.llm = new ChatOpenAI({
+        modelName: process.env.LLM_MODEL || 'qwen-plus',
+        temperature: 0.1,
+        configuration: {
+          baseURL: process.env.LLM_BASE_URL,
+          apiKey: process.env.LLM_API_KEY,
+        },
+      });
+    }
+    return this.llm;
   }
 
   /**
@@ -50,12 +57,22 @@ export class IntentClassifier {
   async classify(message: string, context?: any): Promise<IntentResult> {
     const prompt = this.buildClassificationPrompt(message, context);
 
+    console.log('[IntentClassifier] 开始分析:', { message, hasContext: !!context });
+
     try {
-      const response = await this.llm.invoke(prompt);
+      const llm = this.getLLM();
+      const response = await llm.invoke(prompt);
       const result = this.parseResponse(response.content as string);
+      
+      console.log('[IntentClassifier] 识别成功:', {
+        type: result.type,
+        params: result.params,
+        confidence: result.confidence
+      });
+
       return result;
-    } catch (error) {
-      console.error('[Intent Classifier Error]', error);
+    } catch (error: any) {
+      console.error('[IntentClassifier] LLM 调用失败，使用降级方案:', error.message);
       // 降级：使用简单的关键词匹配
       return this.fallbackClassify(message);
     }
@@ -67,22 +84,23 @@ export class IntentClassifier {
 用户输入: "${message}"
 
 ${context?.lastQuery ? `上一次查询: "${context.lastQuery}"` : ''}
+${context?.lastTable ? `上一次查询的表: "${context.lastTable}"` : ''}
 ${context?.envId ? `当前环境ID: ${context.envId}` : ''}
 
-请分析用户意图，并输出 JSON 格式（仅输出 JSON，不要任何其他文字）：
+请分析用户意图，提取关键参数，并输出 JSON 格式（仅输出 JSON，不要任何其他文字）：
 
 {
-  "type": "意图类型，可选值: QUERY_DATABASE, MODIFY_FIELD, CREATE_COLLECTION, DELETE_COLLECTION, ANALYZE_DATA, DOC_QUESTION, GENERAL_CHAT",
+  "type": "QUERY_DATABASE",
   "confidence": 0.95,
   "params": {
-    "dbType": "flexdb|mysql|mongodb",
-    "table": "表名",
-    "database": "数据库名",
-    "action": "具体操作"
+    "dbType": "flexdb",
+    "table": "集合名称（从用户输入中提取）",
+    "database": "数据库名（可选）",
+    "envId": "环境ID（如果用户提供了）"
   }
 }
 
-意图识别规则：
+意图类型说明：
 1. QUERY_DATABASE: 查询、查找、检索、显示、列出数据
 2. MODIFY_FIELD: 修改、更改、调整字段
 3. CREATE_COLLECTION: 创建、新建表/集合
@@ -91,7 +109,19 @@ ${context?.envId ? `当前环境ID: ${context.envId}` : ''}
 6. DOC_QUESTION: 如何使用、SDK 怎么调用、文档问题
 7. GENERAL_CHAT: 打招呼、闲聊
 
-输出 JSON:`;
+参数提取规则：
+- table: 从"查询 XXX 表"、"XXX 集合"、"XXX 的数据"、"表 XXX"、"表的内容 XXX"中提取集合/表名
+- dbType: 如果提到"flexdb"、"mongodb"用 "flexdb"，提到"mysql"用 "mysql"，否则默认 "flexdb"
+- envId: 从"环境ID是 XXX"、"envId 是 XXX"、"env-id: XXX" 中提取环境ID
+- 如果用户说"再查一下"、"刚才那个表"，使用上下文中的 lastTable
+
+示例：
+输入: "查询 users 表" → {"type":"QUERY_DATABASE","params":{"table":"users","dbType":"flexdb"}}
+输入: "我的环境ID是marisa-dev-com-6g6urdyj6abb73ce，查询flexdb的marisa表的内容" → {"type":"QUERY_DATABASE","params":{"envId":"marisa-dev-com-6g6urdyj6abb73ce","table":"marisa","dbType":"flexdb"}}
+输入: "再查一下刚才那个表" → {"type":"QUERY_DATABASE","params":{"table":"${context?.lastTable || ''}","dbType":"flexdb"}}
+输入: "查询 flexdb 的 orders 集合" → {"type":"QUERY_DATABASE","params":{"table":"orders","dbType":"flexdb"}}
+
+现在分析用户输入并输出 JSON:`;
   }
 
   private parseResponse(content: string): IntentResult {
@@ -190,10 +220,18 @@ ${context?.envId ? `当前环境ID: ${context.envId}` : ''}
       params.dbType = 'mongodb';
     }
 
-    // 提取表名（简单正则）
-    const tableMatch = message.match(/表\s*[：:"]?\s*(\w+)|(\w+)\s*表/);
+    // 提取表名（增强正则，支持更多模式）
+    const tableMatch = message.match(
+      /表\s*[：:"]?\s*([\w-]+)|([\w-]+)\s*表|表的内容\s*([\w-]+)|查询\s*([\w-]+)|集合\s*([\w-]+)|([\w-]+)\s*集合/
+    );
     if (tableMatch) {
-      params.table = tableMatch[1] || tableMatch[2];
+      params.table = tableMatch[1] || tableMatch[2] || tableMatch[3] || tableMatch[4] || tableMatch[5] || tableMatch[6];
+    }
+
+    // 提取环境ID
+    const envIdMatch = message.match(/环境\s*ID\s*[是为:]?\s*([\w-]+)|envId\s*[是为:]?\s*([\w-]+)|env-id\s*[：:]\s*([\w-]+)/i);
+    if (envIdMatch) {
+      params.envId = envIdMatch[1] || envIdMatch[2] || envIdMatch[3];
     }
 
     return params;
