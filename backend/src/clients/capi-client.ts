@@ -19,6 +19,12 @@ interface CapiRequestOptions {
   token?: string;
 }
 
+interface CapiResponse<T = any> {
+  code: string | number;
+  msg?: string;
+  result?: T;
+}
+
 export class CapiClient {
   private baseURL: string;
   private defaultRegion: string;
@@ -104,7 +110,7 @@ export class CapiClient {
         this.token = newToken;
       }
 
-      const result = await response.json();
+      const result = await response.json() as CapiResponse<T>;
 
       console.log('[CAPI Client] Response:', {
         code: result.code,

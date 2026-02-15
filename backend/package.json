@@ -3,13 +3,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx src/index.ts",
-    "dev:watch": "tsx watch src/index.ts",
-    "dev:simple": "node start.mjs",
+    "dev": "node dev.mjs",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "node test-query.js",
-    "test:llm": "node test-llm.mjs"
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "@cloudbase/node-sdk": "latest",
