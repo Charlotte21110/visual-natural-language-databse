@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button, Input } from 'tea-component';
+import { useEnvStore } from '../../store/env-store';
 import './style.less';
 
 interface ChatMessage {
@@ -34,6 +35,9 @@ const ChatArea = ({ onQuery }: ChatAreaProps) => {
     { id: 2, type: 'user', content: '查找最近注册的用户' },
     { id: 3, type: 'ai', content: '我已经为你查询了数据。请查看右侧面板中的结果。', showButton: true },
   ]);
+  
+  // 获取当前选择的环境
+  const { currentEnv } = useEnvStore();
 
   const handleSend = async () => {
     if (!inputValue.trim()) return;
@@ -67,7 +71,10 @@ const ChatArea = ({ onQuery }: ChatAreaProps) => {
         },
         body: JSON.stringify({
           message: userInput,
-          context: {}, // 可以传递上下文信息
+          context: {
+            // ✅ 传递当前选择的环境ID
+            envId: currentEnv?.EnvId,
+          },
         }),
       });
 

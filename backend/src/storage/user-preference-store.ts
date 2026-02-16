@@ -82,3 +82,9 @@ export class UserPreferenceStore {
     return this.store.size;
   }
 }
+
+/**
+ * 全局单例实例
+ * 在整个应用中共享用户偏好设置
+ */
+export const globalUserPreferenceStore = new UserPreferenceStore();
