@@ -40,7 +40,7 @@ export class IntentClassifier {
   private getLLM(): ChatOpenAI {
     if (!this.llm) {
       this.llm = new ChatOpenAI({
-        modelName: process.env.LLM_MODEL || 'qwen-plus',
+        modelName: process.env.LLM_MODEL || 'qwen3-max',
         temperature: 0.1,
         configuration: {
           baseURL: process.env.LLM_BASE_URL,

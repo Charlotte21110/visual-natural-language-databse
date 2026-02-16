@@ -138,7 +138,7 @@ PORT=3001
 # 大模型配置
 LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 LLM_API_KEY=sk-xxx
-LLM_MODEL=qwen-plus
+LLM_MODEL=qwen3-max
 
 # 腾讯云 CloudBase
 TCB_SECRET_ID=AKIDxxx

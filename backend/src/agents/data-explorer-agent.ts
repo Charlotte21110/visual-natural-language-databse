@@ -80,14 +80,21 @@ export class DataExplorerAgent {
    * 查询 FlexDB (MongoDB)
    */
   private async queryFlexDB(envId: string, collectionName: string, context: any) {
-    console.log(`[DataExplorerAgent] Querying FlexDB: ${collectionName}`);
+    console.log(`[DataExplorerAgent] Querying FlexDB:`, {
+      envId,
+      collection: collectionName,
+    });
 
     // 获取数据（默认限制 100 条）
     const limit = context.limit || 100;
     const skip = context.skip || 0;
 
     // 构建查询选项
-    const options: any = { limit, skip };
+    const options: any = {
+      envId,  // ✅ 传入环境 ID
+      limit,
+      skip,
+    };
 
     // 如果有筛选条件
     if (context.where) {

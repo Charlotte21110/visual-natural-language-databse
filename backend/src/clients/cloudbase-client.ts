@@ -7,47 +7,67 @@
 import cloudbase from '@cloudbase/node-sdk';
 
 export class CloudBaseClient {
-  private app: any = null;
-  private db: any = null;
-  private initialized: boolean = false;
+  private apps: Map<string, any> = new Map();
+  private dbs: Map<string, any> = new Map();
+  private secretId: string;
+  private secretKey: string;
+  private defaultEnvId: string;
+  private db: any = null; // 保留默认数据库实例（兼容旧代码）
 
   constructor() {
-    // 懒加载，不在构造函数中初始化
+    // 从环境变量获取密钥
+    this.secretId = process.env.TCB_SECRET_ID || '';
+    this.secretKey = process.env.TCB_SECRET_KEY || '';
+    this.defaultEnvId = process.env.TCB_ENV_ID || '';
+
+    if (!this.secretId || !this.secretKey) {
+      console.warn('[CloudBase] 未配置腾讯云密钥，部分功能将不可用');
+      console.warn('[CloudBase] 请在 .env 中配置 TCB_SECRET_ID 和 TCB_SECRET_KEY');
+    }
+
+    // 如果有默认环境，初始化它（兼容旧代码）
+    if (this.defaultEnvId) {
+      this.db = this.getDB(this.defaultEnvId);
+    }
   }
 
   /**
-   * 初始化 SDK
+   * 获取或初始化指定环境的数据库实例
    */
-  private initSDK() {
-    if (this.initialized) return;
-    this.initialized = true;
-    const secretId = process.env.TCB_SECRET_ID;
-    const secretKey = process.env.TCB_SECRET_KEY;
-    // TODO 这个环境id应该从前端传过来，或者使用项目里存起来的id啊
-    const envId = process.env.TCB_ENV_ID;
-
-    if (!secretId || !secretKey) {
-      console.warn('[CloudBase] 未配置腾讯云密钥，部分功能将不可用');
-      console.warn('[CloudBase] 请在 .env 中配置 TCB_SECRET_ID 和 TCB_SECRET_KEY');
-      return;
+  private getDB(envId: string) {
+    if (!this.secretId || !this.secretKey) {
+      throw new Error('CloudBase 未配置密钥，请在 .env 中配置 TCB_SECRET_ID 和 TCB_SECRET_KEY');
     }
 
     if (!envId) {
-      console.warn('[CloudBase] 未配置默认环境 ID，请在 .env 中配置 TCB_ENV_ID');
+      throw new Error('未指定环境 ID，请传入 envId 参数');
+    }
+
+    // 如果已经初始化过这个环境，直接返回
+    if (this.dbs.has(envId)) {
+      return this.dbs.get(envId);
     }
 
     try {
-      // 初始化 CloudBase
-      this.app = cloudbase.init({
+      // 初始化新环境
+      console.log('[CloudBase] 初始化环境:', envId);
+      const app = cloudbase.init({
         env: envId,
-        secretId,
-        secretKey,
+        secretId: this.secretId,
+        secretKey: this.secretKey,
       });
 
-      this.db = this.app.database();
-      console.log('[CloudBase] SDK 初始化成功', { envId });
+      const db = app.database();
+      
+      // 缓存实例
+      this.apps.set(envId, app);
+      this.dbs.set(envId, db);
+
+      console.log('[CloudBase] 环境初始化成功:', { envId });
+      return db;
     } catch (error) {
-      console.error('[CloudBase] SDK 初始化失败', error);
+      console.error('[CloudBase] 环境初始化失败:', error);
+      throw error;
     }
   }
 
@@ -60,6 +80,7 @@ export class CloudBaseClient {
   async queryCollection(
     collectionName: string,
     options?: {
+      envId?: string;
       where?: Record<string, any>;
       limit?: number;
       skip?: number;
@@ -67,19 +88,18 @@ export class CloudBaseClient {
       field?: Record<string, boolean>;
     }
   ): Promise<any[]> {
-    // 确保初始化
-    if (!this.db) {
-      this.initSDK();
+    const { envId, where, limit = 100, skip = 0, orderBy, field } = options || {};
+
+    if (!envId) {
+      throw new Error('查询集合需要指定 envId');
     }
-    
-    if (!this.db) {
-      throw new Error('CloudBase SDK 未初始化，请检查环境变量配置');
-    }
+
+    // 获取对应环境的数据库实例
+    const db = this.getDB(envId);
 
     try {
-      const { where, limit = 100, skip = 0, orderBy, field } = options || {};
-
       console.log('[CloudBase] 查询集合:', {
+        envId,
         collection: collectionName,
         where,
         limit,
@@ -87,7 +107,7 @@ export class CloudBaseClient {
       });
 
       // 构建查询
-      let query = this.db.collection(collectionName);
+      let query = db.collection(collectionName);
 
       // 添加条件
       if (where && Object.keys(where).length > 0) {
