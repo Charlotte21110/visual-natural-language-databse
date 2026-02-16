@@ -3,12 +3,13 @@
  * 处理用户偏好设置（环境、配置等）
  */
 import { Router } from 'express';
-import { UserPreferenceStore } from '../storage/user-preference-store.js';
+import { globalUserPreferenceStore } from '../storage/user-preference-store.js';
 import { getCapiClient } from '../clients/capi-client.js';
 
 export const userRouter = Router();
 
-const userPreferenceStore = new UserPreferenceStore();
+// 使用全局单例实例，确保与其他模块共享同一份数据
+const userPreferenceStore = globalUserPreferenceStore;
 
 /**
  * POST /api/user/env

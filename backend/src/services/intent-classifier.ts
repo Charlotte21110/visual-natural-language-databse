@@ -3,32 +3,11 @@
  * 使用大模型进行意图分类
  */
 import { ChatOpenAI } from '@langchain/openai';
-import { z } from 'zod';
+import { buildIntentClassificationPrompt, FALLBACK_RULES } from '../prompts/intent-classification.js';
+import { IntentType, IntentResult } from '../types/intent.js';
 
-// 定义意图类型
-export enum IntentType {
-  QUERY_DATABASE = 'QUERY_DATABASE',           // 查询数据库
-  MODIFY_FIELD = 'MODIFY_FIELD',               // 修改字段
-  CREATE_COLLECTION = 'CREATE_COLLECTION',     // 创建集合/表
-  DELETE_COLLECTION = 'DELETE_COLLECTION',     // 删除集合/表
-  ANALYZE_DATA = 'ANALYZE_DATA',               // 分析数据
-  DOC_QUESTION = 'DOC_QUESTION',               // 文档问答
-  GENERAL_CHAT = 'GENERAL_CHAT',               // 普通对话
-}
-
-// 意图分类结果
-export interface IntentResult {
-  type: IntentType;
-  confidence: number;
-  params: {
-    dbType?: 'flexdb' | 'mysql' | 'mongodb';
-    table?: string;
-    database?: string;
-    envId?: string;
-    action?: string;
-    [key: string]: any;
-  };
-}
+// 重新导出类型，方便其他模块使用
+export { IntentType, IntentResult };
 
 export class IntentClassifier {
   private llm: ChatOpenAI | null = null;
@@ -55,7 +34,8 @@ export class IntentClassifier {
    * 分类用户意图
    */
   async classify(message: string, context?: any): Promise<IntentResult> {
-    const prompt = this.buildClassificationPrompt(message, context);
+    // 使用统一的提示词构建函数
+    const prompt = buildIntentClassificationPrompt(message, context);
 
     console.log('[IntentClassifier] 开始分析:', { message, hasContext: !!context });
 
@@ -78,51 +58,6 @@ export class IntentClassifier {
     }
   }
 
-  private buildClassificationPrompt(message: string, context?: any): string {
-    return `你是一个数据库自然语言交互系统的意图分类器。
-
-用户输入: "${message}"
-
-${context?.lastQuery ? `上一次查询: "${context.lastQuery}"` : ''}
-${context?.lastTable ? `上一次查询的表: "${context.lastTable}"` : ''}
-${context?.envId ? `当前环境ID: ${context.envId}` : ''}
-
-请分析用户意图，提取关键参数，并输出 JSON 格式（仅输出 JSON，不要任何其他文字）：
-
-{
-  "type": "QUERY_DATABASE",
-  "confidence": 0.95,
-  "params": {
-    "dbType": "flexdb",
-    "table": "集合名称（从用户输入中提取）",
-    "database": "数据库名（可选）",
-    "envId": "环境ID（如果用户提供了）"
-  }
-}
-
-意图类型说明：
-1. QUERY_DATABASE: 查询、查找、检索、显示、列出数据
-2. MODIFY_FIELD: 修改、更改、调整字段
-3. CREATE_COLLECTION: 创建、新建表/集合
-4. DELETE_COLLECTION: 删除、移除表/集合
-5. ANALYZE_DATA: 分析、统计、对比数据
-6. DOC_QUESTION: 如何使用、SDK 怎么调用、文档问题
-7. GENERAL_CHAT: 打招呼、闲聊
-
-参数提取规则：
-- table: 从"查询 XXX 表"、"XXX 集合"、"XXX 的数据"、"表 XXX"、"表的内容 XXX"中提取集合/表名
-- dbType: 如果提到"flexdb"、"mongodb"用 "flexdb"，提到"mysql"用 "mysql"，否则默认 "flexdb"
-- envId: 从"环境ID是 XXX"、"envId 是 XXX"、"env-id: XXX" 中提取环境ID
-- 如果用户说"再查一下"、"刚才那个表"，使用上下文中的 lastTable
-
-示例：
-输入: "查询 users 表" → {"type":"QUERY_DATABASE","params":{"table":"users","dbType":"flexdb"}}
-输入: "我的环境ID是marisa-dev-com-6g6urdyj6abb73ce，查询flexdb的marisa表的内容" → {"type":"QUERY_DATABASE","params":{"envId":"marisa-dev-com-6g6urdyj6abb73ce","table":"marisa","dbType":"flexdb"}}
-输入: "再查一下刚才那个表" → {"type":"QUERY_DATABASE","params":{"table":"${context?.lastTable || ''}","dbType":"flexdb"}}
-输入: "查询 flexdb 的 orders 集合" → {"type":"QUERY_DATABASE","params":{"table":"orders","dbType":"flexdb"}}
-
-现在分析用户输入并输出 JSON:`;
-  }
 
   private parseResponse(content: string): IntentResult {
     try {
@@ -150,7 +85,7 @@ ${context?.envId ? `当前环境ID: ${context.envId}` : ''}
   private fallbackClassify(message: string): IntentResult {
     const msg = message.toLowerCase();
 
-    if (/查询|查找|检索|显示|列出|查看/.test(msg)) {
+    if (FALLBACK_RULES.queryPatterns.test(msg)) {
       return {
         type: IntentType.QUERY_DATABASE,
         confidence: 0.7,
@@ -158,7 +93,7 @@ ${context?.envId ? `当前环境ID: ${context.envId}` : ''}
       };
     }
 
-    if (/修改|更改|调整.*字段/.test(msg)) {
+    if (FALLBACK_RULES.modifyPatterns.test(msg)) {
       return {
         type: IntentType.MODIFY_FIELD,
         confidence: 0.7,
@@ -166,7 +101,7 @@ ${context?.envId ? `当前环境ID: ${context.envId}` : ''}
       };
     }
 
-    if (/创建|新建/.test(msg)) {
+    if (FALLBACK_RULES.createPatterns.test(msg)) {
       return {
         type: IntentType.CREATE_COLLECTION,
         confidence: 0.7,
@@ -174,7 +109,7 @@ ${context?.envId ? `当前环境ID: ${context.envId}` : ''}
       };
     }
 
-    if (/删除|移除/.test(msg)) {
+    if (FALLBACK_RULES.deletePatterns.test(msg)) {
       return {
         type: IntentType.DELETE_COLLECTION,
         confidence: 0.7,
@@ -182,7 +117,7 @@ ${context?.envId ? `当前环境ID: ${context.envId}` : ''}
       };
     }
 
-    if (/分析|统计|对比/.test(msg)) {
+    if (FALLBACK_RULES.analyzePatterns.test(msg)) {
       return {
         type: IntentType.ANALYZE_DATA,
         confidence: 0.7,
@@ -190,7 +125,7 @@ ${context?.envId ? `当前环境ID: ${context.envId}` : ''}
       };
     }
 
-    if (/如何|怎么|文档|SDK/.test(msg)) {
+    if (FALLBACK_RULES.docPatterns.test(msg)) {
       return {
         type: IntentType.DOC_QUESTION,
         confidence: 0.7,
@@ -206,7 +141,7 @@ ${context?.envId ? `当前环境ID: ${context.envId}` : ''}
   }
 
   /**
-   * 提取参数（简单版）
+   * 提取参数（增强版）
    */
   private extractParams(message: string): Record<string, any> {
     const params: Record<string, any> = {};
@@ -218,20 +153,51 @@ ${context?.envId ? `当前环境ID: ${context.envId}` : ''}
       params.dbType = 'mysql';
     } else if (/mongo/i.test(message)) {
       params.dbType = 'mongodb';
+    } else {
+      params.dbType = 'flexdb'; // 默认
     }
 
     // 提取表名（增强正则，支持更多模式）
     const tableMatch = message.match(
-      /表\s*[：:"]?\s*([\w-]+)|([\w-]+)\s*表|表的内容\s*([\w-]+)|查询\s*([\w-]+)|集合\s*([\w-]+)|([\w-]+)\s*集合/
+      /给\s*([\w-]+)\s*表|表\s*[：:"]?\s*([\w-]+)|([\w-]+)\s*表|表的内容\s*([\w-]+)|查询\s*([\w-]+)|集合\s*([\w-]+)|([\w-]+)\s*集合/
     );
     if (tableMatch) {
-      params.table = tableMatch[1] || tableMatch[2] || tableMatch[3] || tableMatch[4] || tableMatch[5] || tableMatch[6];
+      params.table = tableMatch[1] || tableMatch[2] || tableMatch[3] || tableMatch[4] || tableMatch[5] || tableMatch[6] || tableMatch[7];
     }
 
     // 提取环境ID
     const envIdMatch = message.match(/环境\s*ID\s*[是为:]?\s*([\w-]+)|envId\s*[是为:]?\s*([\w-]+)|env-id\s*[：:]\s*([\w-]+)/i);
     if (envIdMatch) {
       params.envId = envIdMatch[1] || envIdMatch[2] || envIdMatch[3];
+    }
+
+    // 🔥 关键：提取字段操作参数（用于 MODIFY_FIELD）
+    // 识别 "字段名: 值" 模式
+    const fieldValueMatch = message.match(/([\w-]+)\s*[：:]\s*([^\s,，]+)/);
+    if (fieldValueMatch) {
+      params.field = fieldValueMatch[1];
+      params.defaultValue = fieldValueMatch[2];
+      
+      // 判断操作类型
+      if (/加字段|新增字段|添加字段|加上/i.test(message)) {
+        params.action = 'add_field';
+      }
+    }
+
+    // 识别重命名操作
+    const renameMatch = message.match(/([\w-]+)\s*字段\s*(?:改名|重命名|改为|改成)\s*([\w-]+)/);
+    if (renameMatch) {
+      params.field = renameMatch[1];
+      params.newName = renameMatch[2];
+      params.action = 'rename';
+    }
+
+    // 识别类型修改
+    const typeChangeMatch = message.match(/([\w-]+)\s*字段\s*(?:改成|改为|修改为|类型改为)\s*([\w-]+)/);
+    if (typeChangeMatch) {
+      params.field = typeChangeMatch[1];
+      params.newType = typeChangeMatch[2];
+      params.action = 'change_type';
     }
 
     return params;
