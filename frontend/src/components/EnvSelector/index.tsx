@@ -73,8 +73,9 @@ const EnvSelector = () => {
         onChange={handleEnvChange}
         placeholder="选择环境"
         searchable
-        appearance="button"
+        // appearance="button"
         className="env-select"
+        boxClassName="env-select-box"
       />
       {currentEnv && (
         <div className="env-info">

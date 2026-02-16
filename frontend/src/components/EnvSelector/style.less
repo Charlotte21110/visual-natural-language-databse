@@ -74,3 +74,53 @@
   border-color: #ffe58f;
   color: #d48806;
 }
+
+// 全局样式：环境选择器下拉菜单样式覆盖
+.env-select-box {
+  // 下拉菜单选中项使用深绿色
+  .tea-list--option > li.is-selected {
+    background-color: #6aaf9a !important;
+    color: #fff !important;
+  }
+
+  // 覆盖默认的hover样式
+  .tea-list--option > li:hover {
+    background-color: #e8f5f2 !important;
+  }
+
+  // 选中项的hover样式保持深绿色
+  .tea-list--option > li.is-selected:hover {
+    background-color: #6aaf9a !important;
+    color: #fff !important;
+  }
+}
+
+// 按钮选中状态样式
+.env-selector {
+  .tea-btn.is-active,
+  .tea-btn:not(.is-empty) {
+    background-color: #6aaf9a !important;
+    border-color: #6aaf9a !important;
+    color: #fff !important;
+
+    &:hover {
+      background-color: #5a9f8a !important;
+      border-color: #5a9f8a !important;
+    }
+
+    .tea-icon {
+      color: #fff !important;
+    }
+  }
+
+  // 确保下拉框和按钮宽度铺满
+  .tea-dropdown,
+  .tea-dropdown-box {
+    width: 100% !important;
+  }
+
+  .tea-btn {
+    width: 100% !important;
+    justify-content: space-between !important;
+  }
+}
