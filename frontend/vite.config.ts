@@ -45,7 +45,7 @@ function loadTcloudCookie(): CookieData {
     return { cookieStr, skey: skeyMatch?.[1] || '' };
   }
 
-  console.warn('[Proxy] 未找到 cookie.json 或 cookie.txt，请先配置 Cookie！');
+  // 未找到 cookie 文件时静默返回空值（前端主要通过登录页面发送到后端）
   return { cookieStr: '', skey: '' };
 }
 

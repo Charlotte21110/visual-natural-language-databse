@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Input } from 'tea-component';
+import { message } from 'tea-component';
+import EnvSelector from '../EnvSelector';
+import { useAuth } from '../../hooks/useAuth';
 import './style.less';
 
 interface MenuItem {
@@ -16,6 +18,28 @@ interface SidebarProps {
 const Sidebar = ({ activeMenu, onMenuChange }: SidebarProps) => {
   const [expandedDbs, setExpandedDbs] = useState<string[]>(['mysql-prod', 'ecommerce']);
   const [selectedTable, setSelectedTable] = useState('users');
+  const { logout } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      // 调用后端退出接口
+      await fetch('http://localhost:3001/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      // 清除前端状态
+      localStorage.clear();
+      logout();
+      
+      message.success({ content: '已退出登录' });
+    } catch (error) {
+      console.error('退出失败:', error);
+      // 即使后端失败，也清除前端状态
+      localStorage.clear();
+      logout();
+    }
+  };
 
   // 一级菜单
   const menus: MenuItem[] = [
@@ -115,14 +139,11 @@ const Sidebar = ({ activeMenu, onMenuChange }: SidebarProps) => {
         ))}
       </div>
 
-      {/* 数据库实例区域 - 仅在首页显示 */}
+      {/* 环境选择器 - 仅在首页显示 */}
       {activeMenu === 'home' && (
         <>
           <div className="sidebar-section">
-            <div className="section-title">数据库实例</div>
-            <div className="search-box">
-              <Input placeholder="搜索..." size="s" />
-            </div>
+            <EnvSelector />
           </div>
 
           <div className="db-tree">
@@ -155,8 +176,13 @@ const Sidebar = ({ activeMenu, onMenuChange }: SidebarProps) => {
           </div>
 
           <div className="sidebar-footer">
-            <div className="add-instance">
-              <span>+</span> 添加实例
+            <div className="logout-button" onClick={handleLogout}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+              <span>退出登录</span>
             </div>
           </div>
         </>

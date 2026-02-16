@@ -32,34 +32,13 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// 登录接口
-app.post('/api/auth/login', (req, res) => {
-  try {
-    const { cookie, envId } = req.body;
+// 用户路由（环境偏好设置等）
+import { userRouter } from './routes/user.js';
+app.use('/api/user', userRouter);
 
-    if (!cookie) {
-      return res.status(400).json({
-        error: 'Bad Request',
-        message: 'cookie is required',
-      });
-    }
-
-    // TODO: 存储到内存/Redis
-    console.log('[Auth] Cookie 已保存');
-
-    res.json({
-      success: true,
-      message: '登录态已保存',
-      envId: envId || process.env.TCB_ENV_ID,
-    });
-  } catch (error: any) {
-    console.error('[Auth] 登录错误:', error);
-    res.status(500).json({
-      error: 'Internal Server Error',
-      message: error.message,
-    });
-  }
-});
+// 认证路由
+import { authRouter } from './routes/auth.js';
+app.use('/api/auth', authRouter);
 
 // 查询接口
 app.post('/api/chat/query', async (req, res) => {
@@ -112,5 +91,6 @@ app.listen(PORT, () => {
   console.log(`\n💡 可用功能:`);
   console.log(`  - 登录: POST /api/auth/login`);
   console.log(`  - 查询: POST /api/chat/query`);
+  console.log(`  - 用户环境: GET/POST /api/user/env`);
   console.log(`\n🔧 使用懒加载，首次调用时会初始化 LLM 和 CloudBase\n`);
 });

@@ -1,11 +1,12 @@
 /**
  * CAPI Client
  * 封装腾讯云 CAPI 调用（用于不支持的 SDK 操作）
- * TODO marisa 估计这里调用转发代理有问题的要细看
  * 
  * 用途：当 @tcb-manager/node 不支持某些操作时（如修改字段、创建数据模型），
  *       通过 CAPI 直接调用云 API
  */
+import { extractSkeyFromCookie, generateAntiCsrfCode } from '../utils/csrf.js';
+import { randomUUID } from '../utils/uuid.js';
 
 interface CapiRequestParams {
   serviceType: string;
@@ -32,9 +33,8 @@ export class CapiClient {
   private token: string;
 
   constructor() {
-    // 这里使用腾讯云 CAPI 网关地址
-    // 也可以使用 Weda 的代理地址
-    this.baseURL = process.env.CAPI_BASE_URL || 'https://console.cloud.tencent.com';
+    // 使用 Weda CAPI 地址（与前端 Vite 代理一致）
+    this.baseURL = process.env.CAPI_BASE_URL || 'https://weda-api.cloud.tencent.com';
     this.defaultRegion = process.env.DEFAULT_REGION || 'ap-shanghai';
     
     // Cookie 和 Token 可以从环境变量或配置中读取
@@ -74,29 +74,38 @@ export class CapiClient {
       throw new Error('CAPI 调用需要 Cookie，请先登录或配置环境变量');
     }
 
-    const endpoint = `${this.baseURL}/api/capi`;
+    const endpoint = `${this.baseURL}/qcloud-weida/v1/capi?i=${apiIdentifier}`;
     
     console.log('[CAPI Client] Request:', {
       apiIdentifier,
+      endpoint,
       region: region || this.defaultRegion,
+      hasCookie: !!cookie,
     });
+
+    // 提取 skey 并生成 CSRF code
+    const skey = extractSkeyFromCookie(cookie);
+    const csrfCode = generateAntiCsrfCode(skey);
 
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json; charset=utf-8',
           'Cookie': cookie,
           'X-Qcloud-Token': token,
+          'X-Req-Id': randomUUID(),
           'X-Tcb-Source': 'naturalLanguageDb/backend',
+          'X-CsrfCode': csrfCode,
+          'X-TC-Language': 'zh-CN',
         },
         body: JSON.stringify({
+          raw: true,
           serviceType,
           actionName: action,
           actionParam: data || {},
           region: region || this.defaultRegion,
           signVersion: 'v3',
-          raw: true,
         }),
       });
 
