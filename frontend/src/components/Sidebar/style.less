@@ -101,7 +101,7 @@
   border-top: 1px solid @border-color-light;
   margin-top: auto;
 
-  .add-instance {
+  .logout-button {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -112,9 +112,17 @@
     color: @text-secondary-color;
     transition: all 0.2s ease;
 
+    svg {
+      opacity: 0.6;
+    }
+
     &:hover {
-      background: @border-color-light;
-      color: @brand-color;
+      background: rgba(217, 48, 38, 0.1);
+      color: #d93026;
+
+      svg {
+        opacity: 1;
+      }
     }
   }
 }

@@ -33,7 +33,10 @@ authRouter.post('/login', (req, res) => {
     const capiClient = getCapiClient();
     capiClient.setCookie(cookie);
 
-    console.log('[Auth] Cookie saved successfully');
+    console.log('[Auth] Cookie saved successfully', {
+      cookieLength: cookie.length,
+      hasSkey: cookie.includes('skey'),
+    });
 
     res.json({
       success: true,
