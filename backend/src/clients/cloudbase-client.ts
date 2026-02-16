@@ -262,6 +262,65 @@ export class CloudBaseClient {
   }
 
   /**
+   * 更新数据（批量更新）
+   * 
+   * 文档参考: backend/docs/api-reference/server/node-sdk/database/update.md
+   * 
+   * @param envId 环境ID
+   * @param collectionName 集合名称
+   * @param where 查询条件（空对象 {} 表示匹配所有文档）
+   * @param data 要更新的数据
+   * 
+   * @example
+   * ```js
+   * // 给所有文档添加新字段
+   * const result = await cloudbase.updateDocuments('env-id', 'todos', {}, {
+   *   newField: 'value'
+   * })
+   * 
+   * // 更新符合条件的文档
+   * const result = await cloudbase.updateDocuments('env-id', 'todos', {
+   *   completed: false
+   * }, {
+   *   completed: true,
+   *   updatedAt: new Date()
+   * })
+   * ```
+   */
+  async updateDocuments(
+    envId: string,
+    collectionName: string,
+    where: Record<string, any>,
+    data: Record<string, any>
+  ): Promise<{ updated: number; stats?: any }> {
+    const db = this.getDB(envId);
+
+    try {
+      console.log('[CloudBase] 批量更新:', {
+        envId,
+        collectionName,
+        where,
+        data,
+      });
+
+      const result = await db
+        .collection(collectionName)
+        .where(where)
+        .update(data);
+
+      console.log('[CloudBase] 更新结果:', result);
+
+      return {
+        updated: result.updated || 0,
+        stats: result.stats,
+      };
+    } catch (error: any) {
+      console.error('[CloudBase] 更新失败:', error);
+      throw new Error(`更新失败: ${error.message}`);
+    }
+  }
+
+  /**
    * 获取查询指令（用于复杂条件）
    * 
    * 返回 db.command，前端可以这样用：
