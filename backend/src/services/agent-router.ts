@@ -2,10 +2,12 @@
  * Agent Router
  * 根据意图路由到对应的 Agent
  */
-import { IntentResult, IntentType } from './intent-classifier.js';
+import { IntentType, IntentResult } from '../types/intent.js';
 import { DataExplorerAgent } from '../agents/data-explorer-agent.js';
 import { DocAssistantAgent } from '../agents/doc-assistant-agent.js';
 import { FieldMutatorAgent } from '../agents/field-mutator-agent.js';
+import { ChatOpenAI } from '@langchain/openai';
+import { buildGeneralChatPrompt, generateContextualSuggestions } from '../prompts/general-chat.js';
 
 export interface AgentResponse {
   type: string;
@@ -19,11 +21,53 @@ export class AgentRouter {
   private dataExplorerAgent: DataExplorerAgent;
   private docAssistantAgent: DocAssistantAgent;
   private fieldMutatorAgent: FieldMutatorAgent;
+  private llm: ChatOpenAI | null = null;
 
   constructor() {
     this.dataExplorerAgent = new DataExplorerAgent();
     this.docAssistantAgent = new DocAssistantAgent();
     this.fieldMutatorAgent = new FieldMutatorAgent();
+  }
+
+  private getLLM(): ChatOpenAI {
+    if (!this.llm) {
+      this.llm = new ChatOpenAI({
+        modelName: process.env.LLM_MODEL || 'qwen3-max',
+        temperature: 0.7, // 对话模式，温度稍高
+        configuration: {
+          baseURL: process.env.LLM_BASE_URL,
+          apiKey: process.env.LLM_API_KEY,
+        },
+      });
+    }
+    return this.llm;
+  }
+
+  /**
+   * 处理普通对话（使用 LLM 生成回复，支持上下文）
+   */
+  private async handleGeneralChat(message: string, context: any): Promise<AgentResponse> {
+    try {
+      // 使用统一的提示词配置
+      const prompt = buildGeneralChatPrompt(message, context);
+
+      const llm = this.getLLM();
+      const response = await llm.invoke(prompt);
+      
+      return {
+        type: 'general_chat',
+        message: (response.content as string).trim(),
+        suggestions: generateContextualSuggestions(context),
+      };
+    } catch (error: any) {
+      console.error('[Agent Router] General chat error:', error);
+      // 降级：返回固定回复
+      return {
+        type: 'general_chat',
+        message: '你好！我是 Natural Language DB 助手。我可以帮你查询数据库、分析数据、回答文档问题。请告诉我你想做什么？',
+        suggestions: generateContextualSuggestions(context),
+      };
+    }
   }
 
   /**
@@ -72,15 +116,8 @@ export class AgentRouter {
           return await this.docAssistantAgent.execute(message, intent.params, context);
 
         case IntentType.GENERAL_CHAT:
-          return {
-            type: 'general_chat',
-            message: '你好！我是 Natural Language DB 助手。我可以帮你查询数据库、分析数据、回答文档问题。请告诉我你想做什么？',
-            suggestions: [
-              '查询 flexdb 的 users 表',
-              '如何连接 MongoDB',
-              '创建一个数据模型',
-            ],
-          };
+          // 🔥 使用 LLM 生成灵活的回复（支持上下文）
+          return await this.handleGeneralChat(message, context);
 
         default:
           return {
