@@ -24,3 +24,5 @@ cookie.txt
 *.njsproj
 *.sln
 *.sw?
+
+.cursor

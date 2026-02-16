@@ -156,7 +156,7 @@ console.log('共导出 ' + document.cookie.split('; ').length + ' 个 cookies');
                       type="link"
                       onClick={() => {
                         navigator.clipboard.writeText(scriptCode);
-                        notification.success({ content: '脚本已复制到剪贴板' });
+                        message.success({ content: '脚本已复制到剪贴板' });
                       }}
                     >
                       复制脚本

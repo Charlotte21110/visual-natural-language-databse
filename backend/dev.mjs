@@ -10,16 +10,15 @@ const execAsync = promisify(exec);
 
 console.log('🚀 启动开发服务器...\n');
 
-// 检查 dist 目录是否存在
-if (!fs.existsSync('dist')) {
-  console.log('📦 首次运行，正在编译 TypeScript...');
-  try {
-    await execAsync('npx tsc');
-    console.log('✅ 编译完成\n');
-  } catch (error) {
-    console.error('❌ 编译失败:', error.message);
-    process.exit(1);
-  }
+// 每次都重新编译（确保代码是最新的）
+console.log('📦 正在编译 TypeScript...');
+try {
+  await execAsync('npx tsc');
+  console.log('✅ 编译完成\n');
+} catch (error) {
+  console.error('❌ 编译失败:', error.message);
+  console.error(error.stdout || error.stderr);
+  process.exit(1);
 }
 
 // 启动服务
