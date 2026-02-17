@@ -59,7 +59,7 @@ const QueryResult = ({ data, metadata, suggestions, message, onSuggestionClick }
     <div className="query-result">
       <div className="result-header">
         <div className="result-title">
-          {message || '查询结果'}
+          {'查询结果'}
         </div>
         <div className="result-actions">
           <Button type="weak" size="s">导出</Button>
