@@ -1,14 +1,22 @@
 /**
  * Agent Router
  * 根据意图路由到对应的 Agent
+ *
+ * 🔥 新增：Tool-based Agent 模式
+ * - 数据库操作使用 ToolAgent（AI 自动选择工具和生成参数）
+ * - 其他操作保持原有方式
  */
 import { IntentType, IntentResult } from '../types/intent.js';
 import { DataExplorerAgent } from '../agents/data-explorer-agent.js';
 import { DocAssistantAgent } from '../agents/doc-assistant-agent.js';
 import { FieldMutatorAgent } from '../agents/field-mutator-agent.js';
 import { DocumentManagerAgent } from '../agents/document-manager-agent.js';
+import { ToolAgent } from '../agents/tool-agent.js';
 import { ChatOpenAI } from '@langchain/openai';
 import { buildGeneralChatPrompt, generateContextualSuggestions } from '../prompts/general-chat.js';
+
+// 是否启用 Tool Agent 模式（可通过环境变量控制）
+const USE_TOOL_AGENT = process.env.USE_TOOL_AGENT !== 'false';
 
 export interface AgentResponse {
   type: string;
@@ -23,6 +31,7 @@ export class AgentRouter {
   private docAssistantAgent: DocAssistantAgent;
   private fieldMutatorAgent: FieldMutatorAgent;
   private documentManagerAgent: DocumentManagerAgent;
+  private toolAgent: ToolAgent;  // 🔥 新增
   private llm: ChatOpenAI | null = null;
 
   constructor() {
@@ -30,6 +39,9 @@ export class AgentRouter {
     this.docAssistantAgent = new DocAssistantAgent();
     this.fieldMutatorAgent = new FieldMutatorAgent();
     this.documentManagerAgent = new DocumentManagerAgent();
+    this.toolAgent = new ToolAgent();  // 🔥 新增
+
+    console.log('[AgentRouter] Tool Agent 模式:', USE_TOOL_AGENT ? '已启用' : '已禁用');
   }
 
   private getLLM(): ChatOpenAI {
@@ -89,8 +101,23 @@ export class AgentRouter {
     }
 
     try {
+      // 🔥 数据库相关操作：优先使用 ToolAgent（AI 自动选择工具和生成参数）
+      const dbOperations = [
+        IntentType.QUERY_DATABASE,
+        IntentType.INSERT_DOCUMENT,
+        IntentType.MODIFY_FIELD,
+        IntentType.ANALYZE_DATA,
+      ];
+
+      if (USE_TOOL_AGENT && dbOperations.includes(intent.type)) {
+        console.log('[AgentRouter] 使用 ToolAgent 处理数据库操作');
+        return await this.toolAgent.execute(message, context);
+      }
+
+      // 降级到原有 Agent 或处理其他意图
       switch (intent.type) {
         case IntentType.QUERY_DATABASE:
+          // 仅当 USE_TOOL_AGENT=false 时走这里
           return await this.dataExplorerAgent.execute(message, intent.params, context);
 
         case IntentType.INSERT_DOCUMENT:
@@ -116,7 +143,7 @@ export class AgentRouter {
           };
 
         case IntentType.ANALYZE_DATA:
-          // TODO: 实现 DataAnalyzerAgent
+          // 仅当 USE_TOOL_AGENT=false 时走这里
           return {
             type: 'not_implemented',
             message: '数据分析功能正在开发中，敬请期待！',
