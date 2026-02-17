@@ -16,10 +16,15 @@ export const INTENT_DESCRIPTIONS = {
     keywords: ['查询', '查找', '检索', '显示', '列出', '查看', '获取'],
     description: '用户想要查询、查找、检索、显示、列出数据库中的数据',
   },
+  [IntentType.INSERT_DOCUMENT]: {
+    name: '新增文档',
+    keywords: ['新增文档', '添加文档', '插入文档', '加一条', '新增一条', '插入一条', '添加一条记录', '新增记录', '插入数据'],
+    description: '用户想要往表里添加一条新记录（INSERT操作），注意：这是添加新的一行数据，不是给现有数据加字段！',
+  },
   [IntentType.MODIFY_FIELD]: {
     name: '字段修改',
-    keywords: ['修改', '更改', '调整', '加字段', '添加字段', '新增字段', '删除字段', '改名', '重命名', '改类型'],
-    description: '用户想要修改表结构：新增/删除/重命名字段，或修改字段类型',
+    keywords: ['加字段', '添加字段', '新增字段', '删除字段', '改名', '重命名', '改类型', '修改字段'],
+    description: '用户想要修改表结构：给所有记录新增/删除/重命名字段，或修改字段类型（UPDATE操作）',
   },
   [IntentType.CREATE_COLLECTION]: {
     name: '创建表/集合',
@@ -145,6 +150,55 @@ export const PARAM_EXTRACTION_RULES = {
 }
 `,
 
+  // INSERT_DOCUMENT 专用参数
+  [IntentType.INSERT_DOCUMENT]: `
+新增文档参数提取：
+- table: 必填，表名
+- data: 必填，要插入的数据对象（JSON格式）
+
+⚠️ 关键区别（必须理解）：
+- "加上一个文档" → INSERT_DOCUMENT（添加新记录）
+  示例："给 test 表加上一个文档，内容是 test22:test22，test33:test33"
+  
+- "加上一个字段" → MODIFY_FIELD（修改表结构）
+  示例："给 test 表加上一个字段 test22"
+
+识别规则：
+1. 如果用户明确说"文档"、"记录"、"一条数据" → INSERT_DOCUMENT
+2. 如果用户说"字段" → MODIFY_FIELD
+3. 如果用户说"加上一个 X:Y, Z:W"（多个键值对） → INSERT_DOCUMENT
+4. 如果用户说"加上一个 X:Y"（单个键值对且没说"字段"） → INSERT_DOCUMENT
+
+data 提取方法：
+- 从 "内容是 test22:test22，test33:test33" 中提取
+- 从 "数据是 {name: '张三', age: 25}" 中提取
+- 从 "test22:test22, test33:test33" 中提取
+- 格式：{"test22": "test22", "test33": "test33"}
+
+示例：
+
+输入: "给 test 表加上一个文档，内容是 test22:test22，test33:test33"
+→ {
+  "table": "test",
+  "data": {"test22": "test22", "test33": "test33"},
+  "dbType": "flexdb"
+}
+
+输入: "往 users 表插入一条记录：name: 张三, age: 25"
+→ {
+  "table": "users",
+  "data": {"name": "张三", "age": 25},
+  "dbType": "flexdb"
+}
+
+输入: "新增一个文档到 orders 表，订单号是 12345"
+→ {
+  "table": "orders",
+  "data": {"订单号": "12345"},
+  "dbType": "flexdb"
+}
+`,
+
   // CREATE_COLLECTION 专用参数
   [IntentType.CREATE_COLLECTION]: `
 创建表参数提取：
@@ -229,6 +283,8 @@ ${intentList}
 ## 参数提取规则
 
 ${PARAM_EXTRACTION_RULES.common}
+
+${PARAM_EXTRACTION_RULES[IntentType.INSERT_DOCUMENT]}
 
 ${PARAM_EXTRACTION_RULES[IntentType.MODIFY_FIELD]}
 

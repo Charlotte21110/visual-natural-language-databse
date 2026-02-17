@@ -6,6 +6,7 @@ import { IntentType, IntentResult } from '../types/intent.js';
 import { DataExplorerAgent } from '../agents/data-explorer-agent.js';
 import { DocAssistantAgent } from '../agents/doc-assistant-agent.js';
 import { FieldMutatorAgent } from '../agents/field-mutator-agent.js';
+import { DocumentManagerAgent } from '../agents/document-manager-agent.js';
 import { ChatOpenAI } from '@langchain/openai';
 import { buildGeneralChatPrompt, generateContextualSuggestions } from '../prompts/general-chat.js';
 
@@ -21,12 +22,14 @@ export class AgentRouter {
   private dataExplorerAgent: DataExplorerAgent;
   private docAssistantAgent: DocAssistantAgent;
   private fieldMutatorAgent: FieldMutatorAgent;
+  private documentManagerAgent: DocumentManagerAgent;
   private llm: ChatOpenAI | null = null;
 
   constructor() {
     this.dataExplorerAgent = new DataExplorerAgent();
     this.docAssistantAgent = new DocAssistantAgent();
     this.fieldMutatorAgent = new FieldMutatorAgent();
+    this.documentManagerAgent = new DocumentManagerAgent();
   }
 
   private getLLM(): ChatOpenAI {
@@ -80,10 +83,18 @@ export class AgentRouter {
   ): Promise<AgentResponse> {
     console.log(`[Agent Router] Routing to ${intent.type}`);
 
+    if (!intent.params.envId && context.envId) {
+      intent.params.envId = context.envId;
+      console.log('[Agent Router] 注入 envId:', context.envId);
+    }
+
     try {
       switch (intent.type) {
         case IntentType.QUERY_DATABASE:
           return await this.dataExplorerAgent.execute(message, intent.params, context);
+
+        case IntentType.INSERT_DOCUMENT:
+          return await this.documentManagerAgent.execute(message, intent.params, context);
 
         case IntentType.MODIFY_FIELD:
           return await this.fieldMutatorAgent.execute(message, intent.params, context);
