@@ -8,6 +8,7 @@
  */
 export enum IntentType {
   QUERY_DATABASE = 'QUERY_DATABASE',           // 查询数据库
+  INSERT_DOCUMENT = 'INSERT_DOCUMENT',         // 新增文档（添加一条新记录）
   MODIFY_FIELD = 'MODIFY_FIELD',               // 修改字段
   CREATE_COLLECTION = 'CREATE_COLLECTION',     // 创建集合/表
   DELETE_COLLECTION = 'DELETE_COLLECTION',     // 删除集合/表
@@ -33,6 +34,7 @@ export interface IntentResult {
     newType?: string;
     defaultValue?: any;
     fieldType?: string;
+    data?: Record<string, any>;  // INSERT_DOCUMENT: 要插入的数据对象
     [key: string]: any;
   };
 }

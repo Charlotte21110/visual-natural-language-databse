@@ -171,16 +171,40 @@ export class IntentClassifier {
       params.envId = envIdMatch[1] || envIdMatch[2] || envIdMatch[3];
     }
 
-    // 🔥 关键：提取字段操作参数（用于 MODIFY_FIELD）
-    // 识别 "字段名: 值" 模式
-    const fieldValueMatch = message.match(/([\w-]+)\s*[：:]\s*([^\s,，]+)/);
-    if (fieldValueMatch) {
-      params.field = fieldValueMatch[1];
-      params.defaultValue = fieldValueMatch[2];
-      
-      // 判断操作类型
-      if (/加字段|新增字段|添加字段|加上/i.test(message)) {
-        params.action = 'add_field';
+    // 🔥 关键：提取数据参数
+    // 优先识别多键值对（用于 INSERT_DOCUMENT）
+    const multiFieldMatch = message.match(/(?:内容是|数据是)?\s*([\w-]+)\s*[：:]\s*([^\s,，]+)(?:\s*[,，]\s*([\w-]+)\s*[：:]\s*([^\s,，]+))+/);
+    if (multiFieldMatch) {
+      // 多个键值对 → INSERT_DOCUMENT
+      const dataObj: Record<string, any> = {};
+      // 提取所有 key:value 对
+      const pairs = message.match(/([\w-]+)\s*[：:]\s*([^\s,，]+)/g);
+      if (pairs) {
+        pairs.forEach(pair => {
+          const [key, value] = pair.split(/[：:]/);
+          dataObj[key.trim()] = value.trim();
+        });
+        params.data = dataObj;
+      }
+    } else {
+      // 单个键值对 → MODIFY_FIELD 或 INSERT_DOCUMENT（根据意图判断）
+      const fieldValueMatch = message.match(/([\w-]+)\s*[：:]\s*([^\s,，]+)/);
+      if (fieldValueMatch) {
+        // 如果用户明确说"文档"或"记录"，提取为 data
+        if (/文档|记录|一条/i.test(message)) {
+          params.data = {
+            [fieldValueMatch[1]]: fieldValueMatch[2]
+          };
+        } else {
+          // 否则提取为 field/defaultValue（用于 MODIFY_FIELD）
+          params.field = fieldValueMatch[1];
+          params.defaultValue = fieldValueMatch[2];
+          
+          // 判断操作类型
+          if (/加字段|新增字段|添加字段/i.test(message)) {
+            params.action = 'add_field';
+          }
+        }
       }
     }
 

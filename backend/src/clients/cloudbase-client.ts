@@ -321,6 +321,58 @@ export class CloudBaseClient {
   }
 
   /**
+   * 新增文档（单条插入）
+   * 
+   * 文档参考: backend/docs/api-reference/server/node-sdk/database/add.md
+   * 
+   * @param envId 环境ID
+   * @param collectionName 集合名称
+   * @param data 要插入的数据对象
+   * 
+   * @example
+   * ```js
+   * // 添加单条记录
+   * const result = await cloudbase.insertDocument('env-id', 'todos', {
+   *   title: '学习 CloudBase',
+   *   content: '完成数据库操作教程',
+   *   completed: false,
+   *   createdAt: new Date()
+   * })
+   * 
+   * console.log('新增成功，文档 ID:', result.id)
+   * ```
+   */
+  async insertDocument(
+    envId: string,
+    collectionName: string,
+    data: Record<string, any>
+  ): Promise<{ id: string; insertedCount?: number }> {
+    const db = this.getDB(envId);
+
+    try {
+      console.log('[CloudBase] 新增文档:', {
+        envId,
+        collectionName,
+        data,
+      });
+
+      const result = await db
+        .collection(collectionName)
+        .add(data);
+
+      console.log('[CloudBase] 新增结果:', result);
+
+      return {
+        id: result.id || result._id,
+        insertedCount: 1,
+      };
+    } catch (error: any) {
+      console.error('[CloudBase] 新增失败:', error);
+      throw new Error(`新增文档失败: ${error.message}`);
+    }
+  }
+
+  /**
    * 获取查询指令（用于复杂条件）
    * 
    * 返回 db.command，前端可以这样用：
