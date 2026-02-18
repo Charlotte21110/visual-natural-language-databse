@@ -3,42 +3,60 @@
  * 基于 RAG 的文档问答 Agent
  */
 import { AgentResponse } from '../services/agent-router.js';
-// import { RAGService } from '../services/rag-service.js';
+import { getRAGService } from '../services/rag-service.js';
 
 export class DocAssistantAgent {
-  // private rag: RAGService;
-
   constructor() {
-    // TODO: 初始化 RAG 服务
-    // this.rag = new RAGService();
+    // RAG 服务使用单例模式，无需在这里初始化
   }
 
   async execute(
     message: string,
-    params: Record<string, any>,
+    _params: Record<string, any>,
     _context: any
   ): Promise<AgentResponse> {
     console.log('[DocAssistantAgent] Question:', message);
 
-    // TODO: 实现完整的 RAG 流程
-    // 1. 向量检索
-    // 2. 召回相关文档片段
-    // 3. 生成回答
+    try {
+      // 使用 RAG 服务回答问题
+      const rag = getRAGService();
+      const result = await rag.answer(message);
 
-    // 暂时返回占位响应
-    return {
-      type: 'doc_answer',
-      message: '文档问答功能正在开发中。你可以先访问 CloudBase 官方文档查看详细信息。',
-      metadata: {
-        question: message,
-        sources: [
-          { title: 'CloudBase 文档', url: 'https://cloud.tencent.com/document/product/876' },
+      return {
+        type: 'doc_answer',
+        message: result.answer,
+        metadata: {
+          question: message,
+          sources: result.sources.map(s => ({
+            title: s.title,
+            content: s.content,
+            score: s.score,
+          })),
+        },
+        // TODO marisa 这个suggestions地方没反应没显示，后期优化
+        suggestions: [
+          '查询数据表',
+          '如何创建索引',
+          '数据库权限设置',
         ],
-      },
-      suggestions: [
-        '查询数据表',
-        '创建数据模型',
-      ],
-    };
+      };
+    } catch (error: any) {
+      console.error('[DocAssistantAgent] Error:', error);
+      return {
+        type: 'doc_answer',
+        message: `文档查询失败: ${error.message}。你可以访问 CloudBase 官方文档获取帮助。`,
+        metadata: {
+          question: message,
+          error: error.message,
+          sources: [
+            { title: 'CloudBase 文档', url: 'https://docs.cloudbase.net/' },
+          ],
+        },
+        suggestions: [
+          '查询数据表',
+          '重新提问',
+        ],
+      };
+    }
   }
 }
