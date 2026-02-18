@@ -10,18 +10,19 @@
   },
   "dependencies": {
     "@cloudbase/node-sdk": "latest",
-    "@langchain/community": "^0.3.20",
+    "@langchain/community": "^0.3.59",
     "@langchain/core": "^0.3.24",
     "@langchain/openai": "^0.3.15",
-    "express": "^4.21.2",
+    "chromadb": "^3.3.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
-    "zod": "^3.24.1",
-    "openai": "^4.73.0"
+    "express": "^4.21.2",
+    "openai": "^4.73.0",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@types/express": "^5.0.0",
     "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
     "@types/node": "^20.11.0",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"

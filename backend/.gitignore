@@ -7,3 +7,4 @@ data/
 test-query.js
 
 docs
+.vector_cache
