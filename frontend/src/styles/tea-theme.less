@@ -245,3 +245,27 @@ button.tea-btn--primary,
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+// ========================================
+// @ant-design/x 全局样式覆盖 - 绿色主题
+// ========================================
+
+// Ant Design 主题变量覆盖
+.ant-btn-primary {
+  background: @brand-color !important;
+  border-color: @brand-color !important;
+
+  &:hover, &:focus {
+    background: @brand-color-hover !important;
+    border-color: @brand-color-hover !important;
+  }
+}
+
+// 全局链接颜色
+a {
+  color: @brand-color;
+
+  &:hover {
+    color: @brand-color-hover;
+  }
+}
