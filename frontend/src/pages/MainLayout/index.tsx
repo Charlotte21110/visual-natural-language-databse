@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import Sidebar from '../../components/Sidebar';
+import Sidebar, { type WorkMode } from '../../components/Sidebar';
 import ChatArea from '../../components/ChatArea';
+import DocQAArea from '../../components/DocQAArea';
 import QueryResult from '../../components/QueryResult';
 import './style.less';
 
@@ -21,6 +22,7 @@ interface QueryResultData {
 const MainLayout = () => {
   const [activeMenu, setActiveMenu] = useState('home');
   const [queryResult, setQueryResult] = useState<QueryResultData | null>(null);
+  const [workMode, setWorkMode] = useState<WorkMode>('data-processing');
 
   const handleQuery = (result: QueryResultData) => {
     console.log('Query result received:', result);
@@ -35,17 +37,22 @@ const MainLayout = () => {
   return (
     <div className="main-layout">
       {/* 左侧菜单 */}
-      <Sidebar activeMenu={activeMenu} onMenuChange={setActiveMenu} />
+      <Sidebar
+        activeMenu={activeMenu}
+        onMenuChange={setActiveMenu}
+        workMode={workMode}
+        onWorkModeChange={setWorkMode}
+      />
 
       {/* 主内容区 */}
       <div className="main-content">
-        {activeMenu === 'home' && (
+        {activeMenu === 'home' && workMode === 'data-processing' && (
           <div className="content">
             {/* 中间对话框 */}
             <ChatArea onQuery={handleQuery} />
 
             {/* 右侧查询结果 */}
-            <QueryResult 
+            <QueryResult
               data={queryResult?.data}
               metadata={queryResult?.metadata}
               suggestions={queryResult?.suggestions}
@@ -53,6 +60,10 @@ const MainLayout = () => {
               onSuggestionClick={handleSuggestionClick}
             />
           </div>
+        )}
+
+        {activeMenu === 'home' && workMode === 'doc-qa' && (
+          <DocQAArea />
         )}
 
         {activeMenu === 'model' && (

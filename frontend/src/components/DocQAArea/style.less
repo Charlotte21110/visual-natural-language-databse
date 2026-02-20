@@ -1,0 +1,164 @@
+@import '../../styles/tea-theme.less';
+
+// 文档问答页面
+.doc-qa-page {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+
+  .doc-qa-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px;
+    width: 100%;
+  }
+
+  .doc-qa-header {
+    text-align: center;
+    margin-bottom: 24px;
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: @text-primary-color;
+      margin: 0 0 8px 0;
+    }
+
+    p {
+      font-size: 14px;
+      color: @text-tertiary-color;
+      margin: 0;
+    }
+  }
+}
+
+.doc-qa-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: @bg-color;
+  width: 100%;
+
+  .qa-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+}
+
+// 气泡式聊天消息
+.qa-bubble {
+  display: flex;
+  max-width: 85%;
+
+  &.ai {
+    align-self: flex-start;
+
+    .bubble-content {
+      background: @bubble-color;
+      border-radius: 16px 16px 16px 4px;
+    }
+  }
+
+  &.user {
+    align-self: flex-end;
+
+    .bubble-content {
+      background: white;
+      border-radius: 16px 16px 4px 16px;
+      border: 1px solid @border-color;
+    }
+  }
+
+  .bubble-content {
+    padding: 14px 18px;
+
+    p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.6;
+      color: @text-primary-color;
+      white-space: pre-wrap;
+    }
+  }
+}
+
+// 输入框
+.qa-input {
+  padding: 16px 24px 24px;
+
+  .input-container {
+    display: flex;
+    align-items: center;
+    background: white;
+    border: 1px solid @border-color;
+    border-radius: 24px;
+    padding: 8px 8px 8px 20px;
+    box-shadow: @shadow-sm;
+    gap: 12px;
+
+    > .tea-input,
+    .tea-input__container,
+    .tea-input-container {
+      flex: 1;
+      min-width: 0;
+
+      .tea-input,
+      .tea-input__input {
+        width: 100%;
+        border: none;
+        background: transparent;
+
+        &:focus {
+          box-shadow: none;
+        }
+      }
+    }
+
+    .tea-input {
+      width: 100%;
+
+      input {
+        width: 100%;
+        border: none;
+        background: transparent;
+
+        &:focus {
+          box-shadow: none;
+        }
+      }
+    }
+
+    .input-actions {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+
+      .send-btn {
+        width: 40px;
+        height: 40px;
+        border: none;
+        background: @brand-color;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        transition: all 0.2s ease;
+
+        &:hover {
+          background: @brand-color-hover;
+          transform: scale(1.05);
+        }
+      }
+    }
+  }
+}
+

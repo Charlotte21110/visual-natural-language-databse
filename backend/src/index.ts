@@ -40,6 +40,10 @@ app.use('/api/user', userRouter);
 import { authRouter } from './routes/auth.js';
 app.use('/api/auth', authRouter);
 
+// 文档问答路由
+import { docQARouter } from './routes/doc-qa.js';
+app.use('/api/doc-qa', docQARouter);
+
 // 查询接口
 app.post('/api/chat/query', async (req, res) => {
   try {
@@ -90,7 +94,8 @@ app.listen(PORT, () => {
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`\n💡 可用功能:`);
   console.log(`  - 登录: POST /api/auth/login`);
-  console.log(`  - 查询: POST /api/chat/query`);
+  console.log(`  - 数据处理: POST /api/chat/query`);
+  console.log(`  - 文档问答: POST /api/doc-qa/query`);
   console.log(`  - 用户环境: GET/POST /api/user/env`);
   console.log(`\n🔧 使用懒加载，首次调用时会初始化 LLM 和 CloudBase\n`);
 });

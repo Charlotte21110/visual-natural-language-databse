@@ -10,15 +10,23 @@ interface MenuItem {
   icon: React.ReactNode;
 }
 
+export type WorkMode = 'data-processing' | 'doc-qa';
+
 interface SidebarProps {
   activeMenu: string;
   onMenuChange: (key: string) => void;
+  workMode?: WorkMode;
+  onWorkModeChange?: (mode: WorkMode) => void;
 }
 
-const Sidebar = ({ activeMenu, onMenuChange }: SidebarProps) => {
+const Sidebar = ({ activeMenu, onMenuChange, workMode = 'data-processing', onWorkModeChange }: SidebarProps) => {
   const [expandedDbs, setExpandedDbs] = useState<string[]>(['mysql-prod', 'ecommerce']);
   const [selectedTable, setSelectedTable] = useState('users');
   const { logout } = useAuth();
+
+  const handleWorkModeChange = (mode: WorkMode) => {
+    onWorkModeChange?.(mode);
+  };
 
   const handleLogout = async () => {
     try {
@@ -146,7 +154,42 @@ const Sidebar = ({ activeMenu, onMenuChange }: SidebarProps) => {
             <EnvSelector />
           </div>
 
-          <div className="db-tree">
+          {/* 功能模式选择器 */}
+          <div className="sidebar-section mode-selector">
+            <div className="section-title">功能模式</div>
+            <div className="mode-list">
+              <div
+                className={`mode-item ${workMode === 'data-processing' ? 'active' : ''}`}
+                onClick={() => handleWorkModeChange('data-processing')}
+              >
+                <span className="mode-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                  </svg>
+                </span>
+                <span className="mode-label">数据处理</span>
+              </div>
+              <div
+                className={`mode-item ${workMode === 'doc-qa' ? 'active' : ''}`}
+                onClick={() => handleWorkModeChange('doc-qa')}
+              >
+                <span className="mode-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
+                    <polyline points="10 9 9 9 8 9"/>
+                  </svg>
+                </span>
+                <span className="mode-label">文档问答机</span>
+              </div>
+            </div>
+          </div>
+
+          {/* <div className="db-tree">
             {databases.map(db => (
               <div key={db.id} className="db-group">
                 <div className="db-item" onClick={() => toggleExpand(db.id)}>
@@ -173,7 +216,7 @@ const Sidebar = ({ activeMenu, onMenuChange }: SidebarProps) => {
                 ))}
               </div>
             ))}
-          </div>
+          </div> */}
 
           <div className="sidebar-footer">
             <div className="logout-button" onClick={handleLogout}>
