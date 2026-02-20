@@ -31,9 +31,7 @@ interface ChatAreaProps {
 const ChatArea = ({ onQuery }: ChatAreaProps) => {
   const [inputValue, setInputValue] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 1, type: 'ai', content: '你好！我是 QueryFlow 助手。请用自然语言描述你想要查询的数据，例如："查找最近注册的用户" 或 "统计每月订单量"。' },
-    { id: 2, type: 'user', content: '查找最近注册的用户' },
-    { id: 3, type: 'ai', content: '我已经为你查询了数据。请查看右侧面板中的结果。', showButton: true },
+    { id: 1, type: 'ai', content: '你好！我是 QueryFlow 助手。请用自然语言描述你想要查询的数据，例如："帮我查询flexdb 的 test 表" 或 "教我如何用sdk创建数据"。' },
   ]);
   
   // 获取当前选择的环境
@@ -146,7 +144,7 @@ const ChatArea = ({ onQuery }: ChatAreaProps) => {
             value={inputValue}
             onChange={(value) => setInputValue(value)}
             onKeyDown={handleKeyPress}
-            placeholder="输入自然语言查询，如：查找最近注册的用户..."
+            placeholder="输入自然语言查询，如：查询 flexdb 的 test 表..."
           />
           <div className="input-actions">
             <button className="send-btn" onClick={handleSend}>
