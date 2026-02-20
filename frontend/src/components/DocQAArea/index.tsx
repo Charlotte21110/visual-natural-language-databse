@@ -1,52 +1,79 @@
 import { useState } from 'react';
-import { Button, Input } from 'tea-component';
+import type { ReactNode } from 'react';
+import { Bubble, Sender, CodeHighlighter } from '@ant-design/x';
+import { XMarkdown } from '@ant-design/x-markdown';
 import './style.less';
 
+// 自定义代码块组件 - 带高亮和复制功能
+interface CodeBlockProps {
+  children?: ReactNode;
+  className?: string;
+  'data-lang'?: string;
+  [key: string]: unknown;
+}
+
+// 将 ReactNode 转换为字符串
+const getTextFromChildren = (children: ReactNode): string => {
+  if (typeof children === 'string') return children;
+  if (typeof children === 'number') return String(children);
+  if (Array.isArray(children)) return children.map(getTextFromChildren).join('');
+  if (children && typeof children === 'object' && 'props' in children) {
+    return getTextFromChildren((children as { props: { children?: ReactNode } }).props.children);
+  }
+  return '';
+};
+
+const CodeBlock = ({ children, className, 'data-lang': dataLang }: CodeBlockProps) => {
+  // 从 className 或 data-lang 属性中提取语言
+  const langMatch = className?.match(/language-(\w+)/);
+  const lang = langMatch?.[1] || dataLang || 'text';
+
+  // 将 ReactNode 转换为字符串
+  const codeContent = getTextFromChildren(children);
+
+  return (
+    <CodeHighlighter lang={lang}>
+      {codeContent}
+    </CodeHighlighter>
+  );
+};
+
+// 消息角色定义
+type MessageRole = 'user' | 'ai';
+
 interface ChatMessage {
-  id: number;
-  type: 'user' | 'ai';
+  key: string;
+  role: MessageRole;
   content: string;
+  loading?: boolean;
 }
 
 const DocQAArea = () => {
   const [inputValue, setInputValue] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 1, type: 'ai', content: '你好！我是文档问答助手。请输入您的问题，我将基于知识库为您解答。' },
+    { key: 'welcome', role: 'ai', content: '你好！我是文档问答助手。请输入您的问题，我将基于知识库为您解答。' },
   ]);
+  const [loading, setLoading] = useState(false);
 
-  const handleSend = async () => {
-    if (!inputValue.trim()) return;
-    
+  const handleSend = async (value: string) => {
+    if (!value.trim() || loading) return;
+
+    const userMsgKey = `user-${Date.now()}`;
+    const aiMsgKey = `ai-${Date.now()}`;
+
     // 添加用户消息
-    const userMsg: ChatMessage = {
-      id: messages.length + 1,
-      type: 'user',
-      content: inputValue,
-    };
-    
-    setMessages(prev => [...prev, userMsg]);
-    
-    const userInput = inputValue;
+    setMessages(prev => [...prev, { key: userMsgKey, role: 'user', content: value }]);
     setInputValue('');
-    
-    // 添加加载提示
-    const loadingMsg: ChatMessage = {
-      id: messages.length + 2,
-      type: 'ai',
-      content: '正在查询知识库...',
-    };
-    setMessages(prev => [...prev, loadingMsg]);
-    
+    setLoading(true);
+
+    // 添加加载中的 AI 消息
+    setMessages(prev => [...prev, { key: aiMsgKey, role: 'ai', content: '', loading: true }]);
+
     try {
-      // 调用文档问答 Agent API（不同于数据处理的接口）
       const response = await fetch('http://localhost:3001/api/doc-qa/query', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          question: userInput,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: value }),
       });
 
       if (!response.ok) {
@@ -54,40 +81,55 @@ const DocQAArea = () => {
       }
 
       const result = await response.json();
-      
-      // 移除加载消息，添加实际响应
-      setMessages(prev => {
-        const filtered = prev.filter(msg => msg.id !== loadingMsg.id);
-        const aiMsg: ChatMessage = {
-          id: Date.now(),
-          type: 'ai',
-          content: result.answer || result.message || '抱歉，暂时无法回答这个问题。',
-        };
-        return [...filtered, aiMsg];
-      });
-      
-    } catch (error: any) {
+
+      // 更新 AI 消息
+      setMessages(prev => prev.map(msg =>
+        msg.key === aiMsgKey
+          ? { ...msg, content: result.answer || result.message || '抱歉，暂时无法回答这个问题。', loading: false }
+          : msg
+      ));
+
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : '未知错误';
       console.error('[Doc QA API Error]', error);
-      
-      // 移除加载消息，显示错误
-      setMessages(prev => {
-        const filtered = prev.filter(msg => msg.id !== loadingMsg.id);
-        const errorMsg: ChatMessage = {
-          id: Date.now(),
-          type: 'ai',
-          content: `抱歉，查询知识库时出错了：${error.message}`,
-        };
-        return [...filtered, errorMsg];
-      });
+      setMessages(prev => prev.map(msg =>
+        msg.key === aiMsgKey
+          ? { ...msg, content: `抱歉，查询知识库时出错了：${errorMessage}`, loading: false }
+          : msg
+      ));
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
+  // 角色配置
+  const roleConfig = {
+    ai: {
+      placement: 'start' as const,
+      typing: { effect: 'typing' as const, step: 5, interval: 20 },
+    },
+    user: {
+      placement: 'end' as const,
+    },
   };
+
+  // XMarkdown 组件配置 - 自定义代码块渲染
+  const markdownComponents = {
+    code: CodeBlock,
+  };
+
+  // 转换为 Bubble.List 的 items 格式
+  const bubbleItems = messages.map((msg) => ({
+    key: msg.key,
+    role: msg.role,
+    loading: msg.loading,
+    content: msg.content,
+    contentRender: (content: string) => (
+      <div className="bubble-wrapper">
+        <XMarkdown components={markdownComponents}>{content}</XMarkdown>
+      </div>
+    ),
+  }));
 
   return (
     <div className="doc-qa-page">
@@ -99,31 +141,22 @@ const DocQAArea = () => {
 
         <div className="doc-qa-area">
           <div className="qa-messages">
-            {messages.map(msg => (
-              <div key={msg.id} className={`qa-bubble ${msg.type}`}>
-                <div className="bubble-content">
-                  <p>{msg.content}</p>
-                </div>
-              </div>
-            ))}
+            <Bubble.List
+              items={bubbleItems}
+              role={roleConfig}
+              autoScroll
+              style={{ height: '100%' }}
+            />
           </div>
 
           <div className="qa-input">
-            <div className="input-container">
-              <Input
-                value={inputValue}
-                onChange={(value) => setInputValue(value)}
-                onKeyDown={handleKeyPress}
-                placeholder="输入您的问题..."
-              />
-              <div className="input-actions">
-                <button className="send-btn" onClick={handleSend}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
+            <Sender
+              value={inputValue}
+              onChange={setInputValue}
+              onSubmit={handleSend}
+              loading={loading}
+              placeholder="输入您的问题..."
+            />
           </div>
         </div>
       </div>
