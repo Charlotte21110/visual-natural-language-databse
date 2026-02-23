@@ -7,57 +7,24 @@
  * 2. AI 自动生成结构化参数（不用手写正则提取）
  * 3. 支持链式调用多个工具
  * 4. 新增功能只需添加 Tool，不用改路由逻辑
+ * 5. 🔥 找不到工具时降级到 RAG 代码生成
  */
 import { ChatOpenAI } from '@langchain/openai';
 import { AgentExecutor, createReactAgent } from 'langchain/agents';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { databaseTools } from '../tools/database-tools.js';
 import { AgentResponse } from '../services/agent-router.js';
-
-// ReAct Agent 的提示词模板
-const REACT_PROMPT = `你是一个数据库操作助手。你可以使用提供的工具来操作 CloudBase FlexDB 数据库。
-
-当前上下文：
-- 环境 ID：{envId}
-- 上一次查询的表：{lastTable}
-
-重要规则：
-1. 用户说的"表"就是"集合"（collection）
-2. 调用工具时，输入必须是有效的 JSON 字符串
-3. 查询条件使用 MongoDB 语法：
-   - 等于：{{"field": "value"}}
-   - 大于：{{"field": {{"$gt": 18}}}}
-   - 包含：{{"field": {{"$in": ["a", "b"]}}}}
-4. 如果用户没指定 envId，使用上下文中的 envId
-
-你可以使用以下工具：
-{tools}
-
-工具名称列表: {tool_names}
-
-使用以下格式回答：
-
-Question: 用户的输入问题
-Thought: 思考下一步应该做什么
-Action: 要使用的工具名称（必须是上面列表中的一个）
-Action Input: 工具的输入（必须是 JSON 字符串）
-Observation: 工具返回的结果
-... (这个 Thought/Action/Action Input/Observation 可以重复多次)
-Thought: 我现在知道最终答案了
-Final Answer: 给用户的最终回复
-
-开始！
-
-Question: {input}
-Thought: {agent_scratchpad}`;
+import { RAGCodeAgent } from './rag-code-agent.js';
+import { REACT_PROMPT } from '../prompts/tool-agent.js';
 
 export class ToolAgent {
   private llm: ChatOpenAI | null = null;
   private agentExecutor: AgentExecutor | null = null;
   private initialized = false;
+  private ragCodeAgent: RAGCodeAgent;  // 🔥 RAG 降级 Agent
 
   constructor() {
-    // 懒加载
+    this.ragCodeAgent = new RAGCodeAgent();
   }
 
   /**
@@ -100,6 +67,7 @@ export class ToolAgent {
 
   /**
    * 执行用户请求
+   * 优先使用 Tool，找不到合适工具时降级到 RAG 代码生成
    */
   async execute(message: string, context: any): Promise<AgentResponse> {
     try {
@@ -120,16 +88,65 @@ export class ToolAgent {
 
       console.log('[ToolAgent] 执行结果:', result);
 
-      // 解析工具调用结果
-      return this.formatResponse(result, context);
+      // 检查是否找到了合适的工具
+      const response = this.formatResponse(result, context);
+
+      // 🔥 如果没有调用任何工具，或者结果表明找不到合适方法，降级到 RAG
+      if (this.shouldFallbackToRAG(result, response)) {
+        console.log('[ToolAgent] 没有找到合适的工具，降级到 RAG Code Agent');
+        return await this.ragCodeAgent.execute(message, context);
+      }
+
+      return response;
     } catch (error: any) {
       console.error('[ToolAgent Error]', error);
-      return {
-        type: 'error',
-        message: `执行失败: ${error.message}`,
-        suggestions: ['检查参数是否正确', '查看文档'],
-      };
+
+      // 🔥 执行出错时也尝试 RAG 降级
+      console.log('[ToolAgent] 执行出错，尝试 RAG 降级');
+      try {
+        return await this.ragCodeAgent.execute(message, context);
+      } catch (ragError: any) {
+        console.error('[RAGCodeAgent Error]', ragError);
+        return {
+          type: 'error',
+          message: `执行失败: ${error.message}`,
+          suggestions: ['检查参数是否正确', '查看文档'],
+        };
+      }
     }
+  }
+
+  /**
+   * 判断是否应该降级到 RAG
+   *
+   * 关键原则：
+   * - 如果大模型调用了工具并给出了合理回复（即使工具执行失败），不降级
+   * - 只有当大模型完全不知道该用什么工具时，才降级到 RAG
+   */
+  private shouldFallbackToRAG(result: any, _response: AgentResponse): boolean {
+    const intermediateSteps = result.intermediateSteps || [];
+    const output = (result.output || '').toLowerCase();
+
+    // 1. 没有调用任何工具 → 降级
+    if (intermediateSteps.length === 0) {
+      console.log('[ToolAgent] 降级原因: 没有调用任何工具');
+      return true;
+    }
+
+    // 2. 输出明确表示不知道怎么做 → 降级
+    const unknownPatterns = [
+      '不知道', '没有这个工具', '无法完成', '不支持这个操作',
+      '没有合适的工具', '找不到对应的'
+    ];
+    if (unknownPatterns.some(p => output.includes(p))) {
+      console.log('[ToolAgent] 降级原因: 大模型表示不知道怎么做');
+      return true;
+    }
+
+    // 3. 工具执行失败但大模型给出了分析 → 不降级，用大模型的回复
+    // 因为大模型已经理解了问题并给出了建议（比如配额超限的情况）
+
+    return false;
   }
 
   /**

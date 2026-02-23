@@ -33,8 +33,9 @@ export class CloudBaseClient {
 
   /**
    * 获取或初始化指定环境的数据库实例
+   * 公开方法，供 RAGCodeAgent 动态执行代码使用
    */
-  private getDB(envId: string) {
+  public getDB(envId: string) {
     if (!this.secretId || !this.secretKey) {
       throw new Error('CloudBase 未配置密钥，请在 .env 中配置 TCB_SECRET_ID 和 TCB_SECRET_KEY');
     }
