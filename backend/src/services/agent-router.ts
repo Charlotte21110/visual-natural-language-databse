@@ -4,6 +4,7 @@
  *
  * 🔥 新增：Tool-based Agent 模式
  * - 数据库操作使用 ToolAgent（AI 自动选择工具和生成参数）
+ * - MySQL 操作使用 MySQLToolAgent
  * - 其他操作保持原有方式
  */
 import { IntentType, IntentResult } from '../types/intent.js';
@@ -12,11 +13,14 @@ import { DocAssistantAgent } from '../agents/doc-assistant-agent.js';
 import { FieldMutatorAgent } from '../agents/field-mutator-agent.js';
 import { DocumentManagerAgent } from '../agents/document-manager-agent.js';
 import { ToolAgent } from '../agents/tool-agent.js';
+import { MySQLToolAgent } from '../agents/mysql-tool-agent.js';
 import { ChatOpenAI } from '@langchain/openai';
 import { buildGeneralChatPrompt, generateContextualSuggestions } from '../prompts/general-chat.js';
 
 // 是否启用 Tool Agent 模式（可通过环境变量控制）
 const USE_TOOL_AGENT = process.env.USE_TOOL_AGENT !== 'false';
+// 是否启用 MySQL Tool Agent（可通过环境变量控制）
+const USE_MYSQL_AGENT = process.env.USE_MYSQL_AGENT !== 'false';
 
 export interface AgentResponse {
   type: string;
@@ -31,7 +35,8 @@ export class AgentRouter {
   private docAssistantAgent: DocAssistantAgent;
   private fieldMutatorAgent: FieldMutatorAgent;
   private documentManagerAgent: DocumentManagerAgent;
-  private toolAgent: ToolAgent;  // 🔥 新增
+  private toolAgent: ToolAgent;
+  private mysqlToolAgent: MySQLToolAgent;  // 🔥 MySQL Agent
   private llm: ChatOpenAI | null = null;
 
   constructor() {
@@ -39,9 +44,11 @@ export class AgentRouter {
     this.docAssistantAgent = new DocAssistantAgent();
     this.fieldMutatorAgent = new FieldMutatorAgent();
     this.documentManagerAgent = new DocumentManagerAgent();
-    this.toolAgent = new ToolAgent();  // 🔥 新增
+    this.toolAgent = new ToolAgent();
+    this.mysqlToolAgent = new MySQLToolAgent();  // 🔥 MySQL Agent
 
     console.log('[AgentRouter] Tool Agent 模式:', USE_TOOL_AGENT ? '已启用' : '已禁用');
+    console.log('[AgentRouter] MySQL Agent 模式:', USE_MYSQL_AGENT ? '已启用' : '已禁用');
   }
 
   private getLLM(): ChatOpenAI {
@@ -101,17 +108,30 @@ export class AgentRouter {
     }
 
     try {
-      // 🔥 数据库相关操作：优先使用 ToolAgent（AI 自动选择工具和生成参数）
+      // 🔥 数据库相关操作：根据 dbType 选择对应的 Agent
       const dbOperations = [
         IntentType.QUERY_DATABASE,
         IntentType.INSERT_DOCUMENT,
         IntentType.MODIFY_FIELD,
         IntentType.ANALYZE_DATA,
+        IntentType.CREATE_COLLECTION,  // 🔥 新增：创建表
+        IntentType.DELETE_COLLECTION,  // 🔥 新增：删除表
       ];
 
-      if (USE_TOOL_AGENT && dbOperations.includes(intent.type)) {
-        console.log('[AgentRouter] 使用 ToolAgent 处理数据库操作');
-        return await this.toolAgent.execute(message, context);
+      if (dbOperations.includes(intent.type)) {
+        const dbType = intent.params.dbType || context.dbType || 'flexdb';
+
+        // 🔥 MySQL 操作：使用 MySQLToolAgent
+        if (USE_MYSQL_AGENT && dbType === 'mysql') {
+          console.log('[AgentRouter] 使用 MySQLToolAgent 处理 MySQL 操作');
+          return await this.mysqlToolAgent.execute(message, context);
+        }
+
+        // FlexDB/MongoDB 操作：使用 ToolAgent
+        if (USE_TOOL_AGENT) {
+          console.log('[AgentRouter] 使用 ToolAgent 处理 FlexDB 操作');
+          return await this.toolAgent.execute(message, context);
+        }
       }
 
       // 降级到原有 Agent 或处理其他意图

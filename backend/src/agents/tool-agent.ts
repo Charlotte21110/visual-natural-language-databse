@@ -151,6 +151,7 @@ export class ToolAgent {
 
   /**
    * 格式化响应
+   * 🔥 优化：从缓存获取完整数据返回给前端，大模型只看了前3条预览
    */
   private formatResponse(result: any, _context: any): AgentResponse {
     // 提取工具调用的数据
@@ -160,7 +161,7 @@ export class ToolAgent {
     let collection = '';
     let count = 0;
 
-    // 解析中间步骤，提取实际数据
+    // 解析中间步骤，提取操作的数据
     for (const step of intermediateSteps) {
       const toolName = step.action?.tool;
       const toolOutput = step.observation;
@@ -169,13 +170,16 @@ export class ToolAgent {
         try {
           const parsed = JSON.parse(toolOutput);
           if (parsed.success) {
-            toolUsed = toolName;
-            collection = parsed.collection || '';
+            toolUsed = toolUsed || toolName;
+            collection = collection || parsed.collection || '';
 
+            // 提取数据
             if (parsed.data) {
               data = parsed.data;
               count = parsed.count || data.length;
-            } else if (parsed.count !== undefined) {
+            }
+
+            if (parsed.count !== undefined) {
               count = parsed.count;
             } else if (parsed.insertedId) {
               // 插入操作

@@ -50,10 +50,24 @@ export class CapiClient {
   }
 
   /**
+   * 获取当前 Cookie
+   */
+  getCookie(): string {
+    return this.cookie;
+  }
+
+  /**
    * 设置 Token
    */
   setToken(token: string) {
     this.token = token;
+  }
+
+  /**
+   * 获取当前 Token
+   */
+  getToken(): string {
+    return this.token;
   }
 
   /**
