@@ -23,6 +23,8 @@ const MainLayout = () => {
   const [activeMenu, setActiveMenu] = useState('home');
   const [queryResult, setQueryResult] = useState<QueryResultData | null>(null);
   const [workMode, setWorkMode] = useState<WorkMode>('data-processing');
+  // 使用对象来同时存储建议文本和时间戳，确保每次点击都能触发
+  const [suggestionData, setSuggestionData] = useState<{ text: string; timestamp: number } | undefined>();
 
   const handleQuery = (result: QueryResultData) => {
     console.log('Query result received:', result);
@@ -31,7 +33,8 @@ const MainLayout = () => {
 
   const handleSuggestionClick = (suggestion: string) => {
     console.log('Suggestion clicked:', suggestion);
-    // TODO: 处理建议点击，可以自动填充到输入框
+    // 设置建议文本和时间戳，触发 ChatArea 自动发送
+    setSuggestionData({ text: suggestion, timestamp: Date.now() });
   };
 
   return (
@@ -49,7 +52,7 @@ const MainLayout = () => {
         {activeMenu === 'home' && workMode === 'data-processing' && (
           <div className="content">
             {/* 中间对话框 */}
-            <ChatArea onQuery={handleQuery} />
+            <ChatArea onQuery={handleQuery} suggestionData={suggestionData} />
 
             {/* 右侧查询结果 */}
             <QueryResult

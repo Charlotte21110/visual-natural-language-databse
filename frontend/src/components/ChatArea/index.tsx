@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { Bubble, Sender, CodeHighlighter } from '@ant-design/x';
 import { XMarkdown } from '@ant-design/x-markdown';
-import { Button } from 'tea-component';
 import { useEnvStore } from '../../store/env-store';
 import './style.less';
 
@@ -56,6 +55,8 @@ interface QueryResult {
 
 interface ChatAreaProps {
   onQuery?: (result: QueryResult) => void;
+  /** 外部传入的建议数据，当变化时自动发送 */
+  suggestionData?: { text: string; timestamp: number };
 }
 
 // 消息角色定义
@@ -65,11 +66,10 @@ interface ChatMessage {
   key: string;
   role: MessageRole;
   content: string;
-  showButton?: boolean;
   loading?: boolean;
 }
 
-const ChatArea = ({ onQuery }: ChatAreaProps) => {
+const ChatArea = ({ onQuery, suggestionData }: ChatAreaProps) => {
   const [inputValue, setInputValue] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -80,6 +80,21 @@ const ChatArea = ({ onQuery }: ChatAreaProps) => {
   ]);
   const [loading, setLoading] = useState(false);
   const { currentEnv } = useEnvStore();
+
+  // 用于追踪上一次的建议时间戳，避免重复发送
+  const lastSuggestionTimestampRef = useRef<number>(0);
+
+  // 当外部传入建议时，自动发送
+  useEffect(() => {
+    if (
+      suggestionData &&
+      suggestionData.timestamp !== lastSuggestionTimestampRef.current &&
+      !loading
+    ) {
+      lastSuggestionTimestampRef.current = suggestionData.timestamp;
+      handleSend(suggestionData.text);
+    }
+  }, [suggestionData]);
 
   const handleSend = async (value: string) => {
     if (!value.trim() || loading) return;
@@ -114,7 +129,7 @@ const ChatArea = ({ onQuery }: ChatAreaProps) => {
       // 更新 AI 消息
       setMessages(prev => prev.map(msg =>
         msg.key === aiMsgKey
-          ? { ...msg, content: result.message || '已为您处理完成', loading: false, showButton: result.type === 'query_result' }
+          ? { ...msg, content: result.message || '已为您处理完成', loading: false }
           : msg
       ));
 
@@ -160,9 +175,6 @@ const ChatArea = ({ onQuery }: ChatAreaProps) => {
     contentRender: (content: string) => (
       <div className="bubble-wrapper">
         <XMarkdown components={markdownComponents}>{content}</XMarkdown>
-        {msg.showButton && (
-          <Button type="primary" className="query-btn" style={{ marginTop: 12 }}>查找</Button>
-        )}
       </div>
     ),
   }));
