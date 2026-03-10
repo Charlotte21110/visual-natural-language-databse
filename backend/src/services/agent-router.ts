@@ -6,7 +6,11 @@
  * - 数据库操作使用 ToolAgent（AI 自动选择工具和生成参数）
  * - MySQL 操作使用 MySQLToolAgent
  * - 其他操作保持原有方式
+ *
+ * 🔥 全部使用 LangChain v1 新 API
  */
+import { ChatOpenAI } from '@langchain/openai';
+import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { IntentType, IntentResult } from '../types/intent.js';
 import { DataExplorerAgent } from '../agents/data-explorer-agent.js';
 import { DocAssistantAgent } from '../agents/doc-assistant-agent.js';
@@ -14,7 +18,6 @@ import { FieldMutatorAgent } from '../agents/field-mutator-agent.js';
 import { DocumentManagerAgent } from '../agents/document-manager-agent.js';
 import { ToolAgent } from '../agents/tool-agent.js';
 import { MySQLToolAgent } from '../agents/mysql-tool-agent.js';
-import { ChatOpenAI } from '@langchain/openai';
 import { buildGeneralChatPrompt, generateContextualSuggestions } from '../prompts/general-chat.js';
 
 // 是否启用 Tool Agent 模式（可通过环境变量控制）
@@ -36,7 +39,7 @@ export class AgentRouter {
   private fieldMutatorAgent: FieldMutatorAgent;
   private documentManagerAgent: DocumentManagerAgent;
   private toolAgent: ToolAgent;
-  private mysqlToolAgent: MySQLToolAgent;  // 🔥 MySQL Agent
+  private mysqlToolAgent: MySQLToolAgent;
   private llm: ChatOpenAI | null = null;
 
   constructor() {
@@ -45,17 +48,18 @@ export class AgentRouter {
     this.fieldMutatorAgent = new FieldMutatorAgent();
     this.documentManagerAgent = new DocumentManagerAgent();
     this.toolAgent = new ToolAgent();
-    this.mysqlToolAgent = new MySQLToolAgent();  // 🔥 MySQL Agent
+    this.mysqlToolAgent = new MySQLToolAgent();
 
     console.log('[AgentRouter] Tool Agent 模式:', USE_TOOL_AGENT ? '已启用' : '已禁用');
     console.log('[AgentRouter] MySQL Agent 模式:', USE_MYSQL_AGENT ? '已启用' : '已禁用');
   }
 
-  private getLLM(): ChatOpenAI {
+  private getLLM() {
     if (!this.llm) {
+      // 🔥 LangChain v1 新写法：ChatOpenAI
       this.llm = new ChatOpenAI({
         modelName: process.env.LLM_MODEL || 'qwen3-max',
-        temperature: 0.7, // 对话模式，温度稍高
+        temperature: 0.7,
         configuration: {
           baseURL: process.env.LLM_BASE_URL,
           apiKey: process.env.LLM_API_KEY,
@@ -66,19 +70,27 @@ export class AgentRouter {
   }
 
   /**
-   * 处理普通对话（使用 LLM 生成回复，支持上下文）
+   * 处理普通对话（使用 LangChain ChatOpenAI）
    */
   private async handleGeneralChat(message: string, context: any): Promise<AgentResponse> {
     try {
-      // 使用统一的提示词配置
-      const prompt = buildGeneralChatPrompt(message, context);
-
+      const promptText = buildGeneralChatPrompt(message, context);
       const llm = this.getLLM();
-      const response = await llm.invoke(prompt);
-      
+
+      // 🔥 LangChain v1：使用 messages 数组
+      const response = await llm.invoke([
+        new SystemMessage('你是 Natural Language DB 助手，专门帮助用户查询数据库、分析数据、回答问题。回复要简洁友好。'),
+        new HumanMessage(promptText),
+      ]);
+
+      // 提取回复内容
+      const content = typeof response.content === 'string'
+        ? response.content
+        : JSON.stringify(response.content);
+
       return {
         type: 'general_chat',
-        message: (response.content as string).trim(),
+        message: content.trim(),
         suggestions: generateContextualSuggestions(context),
       };
     } catch (error: any) {

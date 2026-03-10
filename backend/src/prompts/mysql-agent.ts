@@ -4,7 +4,20 @@
  */
 
 /**
- * MySQL ReAct Agent 提示词
+ * MySQL ReAct Agent 系统提示词（用于 LangGraph createReactAgent）
+ * 这是一个简单的 system prompt，工具信息由 LangGraph 自动注入
+ */
+export const MYSQL_REACT_SYSTEM_PROMPT = `你是一个 MySQL 数据库操作助手。数据库连接已配置好，你只需要生成 SQL 语句。
+
+规则：
+1. 直接生成 SQL 语句，不要询问配置或环境信息
+2. 工具输入只需要纯 SQL 语句字符串
+3. 必须调用 run_sql 工具执行 SQL
+
+请根据用户的请求生成合适的 SQL 并执行。`;
+
+/**
+ * MySQL ReAct Agent 提示词（旧版，保留向后兼容）
  * 用于让 AI 根据自然语言生成 SQL 并执行
  * 🔥 简化版：大模型只负责生成 SQL 语句，envId 由系统自动注入
  */
