@@ -85,7 +85,11 @@ const QueryResult = ({ data, metadata, suggestions, message, onSuggestionClick }
               <Table
                 columns={columns}
                 records={resultData}
-                recordKey="_id"
+                recordKey={(record, index) => {
+                  // 优先使用记录的 _id 或 id，如果都没有则使用索引
+                  const id = record._id ?? record.id;
+                  return id != null ? String(id) : `row-${index}`;
+                }}
                 bordered
               />
             </div>
