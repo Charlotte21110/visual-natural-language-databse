@@ -1,6 +1,6 @@
 /**
  * Tool-based Agent
- * 使用 LangChain Tool Calling 的智能 Agent
+ * 使用 LangGraph createReactAgent 的智能 Agent
  *
  * 核心优势：
  * 1. AI 自动选择合适的工具
@@ -10,16 +10,19 @@
  * 5. 🔥 找不到工具时降级到 RAG 代码生成
  */
 import { ChatOpenAI } from '@langchain/openai';
-import { AgentExecutor, createReactAgent } from 'langchain/agents';
-import { PromptTemplate } from '@langchain/core/prompts';
+import { createReactAgent } from '@langchain/langgraph/prebuilt';
+import { HumanMessage, AIMessage, ToolMessage } from '@langchain/core/messages';
 import { databaseTools } from '../tools/database-tools.js';
 import { AgentResponse } from '../services/agent-router.js';
 import { RAGCodeAgent } from './rag-code-agent.js';
-import { REACT_PROMPT } from '../prompts/tool-agent.js';
+import { REACT_SYSTEM_PROMPT } from '../prompts/tool-agent.js';
+
+// LangGraph createReactAgent 返回的类型
+type ReactAgentGraph = Awaited<ReturnType<typeof createReactAgent>>;
 
 export class ToolAgent {
   private llm: ChatOpenAI | null = null;
-  private agentExecutor: AgentExecutor | null = null;
+  private agent: ReactAgentGraph | null = null;
   private initialized = false;
   private ragCodeAgent: RAGCodeAgent;  // 🔥 RAG 降级 Agent
 
@@ -43,22 +46,12 @@ export class ToolAgent {
       },
     });
 
-    // 创建 ReAct Agent（适用于 DynamicTool）
-    const prompt = PromptTemplate.fromTemplate(REACT_PROMPT);
-
-    const agent = await createReactAgent({
+    // 使用新版 LangGraph createReactAgent（直接返回可调用的 graph）
+    this.agent = createReactAgent({
       llm: this.llm,
       tools: databaseTools,
-      prompt,
-    });
-
-    // 创建执行器
-    this.agentExecutor = new AgentExecutor({
-      agent,
-      tools: databaseTools,
-      verbose: true,  // 开启调试日志
-      returnIntermediateSteps: true,
-      maxIterations: 5,  // 防止无限循环
+      // prompt 可以是 string（作为 system message）
+      prompt: REACT_SYSTEM_PROMPT,
     });
 
     this.initialized = true;
@@ -73,26 +66,32 @@ export class ToolAgent {
     try {
       await this.initialize();
 
-      if (!this.agentExecutor) {
+      if (!this.agent) {
         throw new Error('Agent 初始化失败');
       }
 
       console.log('[ToolAgent] 执行请求:', { message, envId: context.envId });
 
-      // 调用 Agent
-      const result = await this.agentExecutor.invoke({
-        input: message,
-        envId: context.envId || process.env.TCB_ENV_ID || '未配置',
-        lastTable: context.lastTable || '无',
+      // 构建带上下文的消息
+      const envId = context.envId || process.env.TCB_ENV_ID || '未配置';
+      const lastTable = context.lastTable || '无';
+      const userMessage = `上下文信息：环境ID=${envId}，上一次操作的表=${lastTable}\n\n用户请求：${message}`;
+
+      // 使用新版 LangGraph API 调用 Agent
+      const result = await this.agent.invoke({
+        messages: [new HumanMessage(userMessage)],
       });
 
-      console.log('[ToolAgent] 执行结果:', result);
+      console.log('[ToolAgent] 执行结果:', JSON.stringify(result, null, 2));
+
+      // 从 LangGraph 结果中提取信息
+      const parsedResult = this.parseGraphResult(result);
 
       // 检查是否找到了合适的工具
-      const response = this.formatResponse(result, context);
+      const response = this.formatResponse(parsedResult, context);
 
       // 🔥 如果没有调用任何工具，或者结果表明找不到合适方法，降级到 RAG
-      if (this.shouldFallbackToRAG(result, response)) {
+      if (this.shouldFallbackToRAG(parsedResult, response)) {
         console.log('[ToolAgent] 没有找到合适的工具，降级到 RAG Code Agent');
         return await this.ragCodeAgent.execute(message, context);
       }
@@ -114,6 +113,42 @@ export class ToolAgent {
         };
       }
     }
+  }
+
+  /**
+   * 解析 LangGraph 返回的结果
+   * 将 messages 数组转换为旧版 intermediateSteps + output 格式
+   */
+  private parseGraphResult(result: any): { intermediateSteps: any[]; output: string } {
+    const messages = result.messages || [];
+    const intermediateSteps: any[] = [];
+    let output = '';
+
+    for (const msg of messages) {
+      // AIMessage with tool_calls -> 记录 tool 调用
+      if (msg instanceof AIMessage && msg.tool_calls && msg.tool_calls.length > 0) {
+        for (const toolCall of msg.tool_calls) {
+          intermediateSteps.push({
+            action: { tool: toolCall.name, toolInput: toolCall.args },
+            observation: null, // 将在 ToolMessage 中填充
+          });
+        }
+      }
+      // ToolMessage -> 记录 tool 返回结果
+      if (msg instanceof ToolMessage) {
+        // 找到对应的 step 并填充 observation
+        const lastStep = intermediateSteps[intermediateSteps.length - 1];
+        if (lastStep && lastStep.observation === null) {
+          lastStep.observation = msg.content;
+        }
+      }
+      // 最后一个 AIMessage（没有 tool_calls）-> 作为最终输出
+      if (msg instanceof AIMessage && (!msg.tool_calls || msg.tool_calls.length === 0)) {
+        output = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+      }
+    }
+
+    return { intermediateSteps, output };
   }
 
   /**

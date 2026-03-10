@@ -3,8 +3,8 @@
  * 使用本地 JSON 文件持久化向量索引，避免每次重启都重新计算 embedding
  */
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
-import { MemoryVectorStore } from 'langchain/vectorstores/memory';
-import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
+import { MemoryVectorStore } from '@langchain/classic/vectorstores/memory';
+import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { Document } from '@langchain/core/documents';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -209,7 +209,7 @@ export class RAGService {
   async retrieve(query: string, topK = 3): Promise<RetrievalResult[]> {
     if (!this.vectorStore) await this.initialize();
     const results = await this.vectorStore!.similaritySearchWithScore(query, topK);
-    return results.map(([doc, score]) => ({
+    return results.map(([doc, score]: [Document, number]) => ({
       content: doc.pageContent,
       source: doc.metadata.source || 'unknown',
       score: 1 - score,

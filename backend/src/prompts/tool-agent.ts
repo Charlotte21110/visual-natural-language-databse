@@ -4,7 +4,24 @@
  */
 
 /**
- * ReAct Agent 的提示词模板
+ * ReAct Agent 的系统提示词（用于 LangGraph createReactAgent）
+ * 这是一个简单的 system prompt，工具信息由 LangGraph 自动注入
+ */
+export const REACT_SYSTEM_PROMPT = `你是一个数据库操作助手。你可以使用提供的工具来操作 CloudBase FlexDB 数据库。
+
+重要规则：
+1. 用户说的"表"就是"集合"（collection）
+2. 调用工具时，输入必须是有效的 JSON 字符串
+3. 查询条件使用 MongoDB 语法：
+   - 等于：{"field": "value"}
+   - 大于：{"field": {"$gt": 18}}
+   - 包含：{"field": {"$in": ["a", "b"]}}
+4. 如果用户没指定 envId，使用消息中提供的上下文 envId
+
+请根据用户的请求选择合适的工具并执行操作。`;
+
+/**
+ * ReAct Agent 的提示词模板（旧版，保留向后兼容）
  * 用于让 AI 选择合适的工具并生成参数
  */
 export const REACT_PROMPT = `你是一个数据库操作助手。你可以使用提供的工具来操作 CloudBase FlexDB 数据库。

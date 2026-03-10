@@ -49,7 +49,7 @@ CloudBase SDK / ChromaDB
 - **前端**: React 18 + TypeScript + Vite + Tea Component
 - **后端**: Node.js + Express + TypeScript
 - **AI 框架**: LangChain.js
-- **大模型**: 通义千问 / DeepSeek / OpenAI 兼容
+- **大模型**: 阿里百练
 - **数据库**: CloudBase (@tcb-manager/node)
 - **向量检索**: ChromaDB (规划中)
 

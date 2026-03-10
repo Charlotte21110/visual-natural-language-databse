@@ -1,63 +1,95 @@
 /**
  * Intent Classifier
- * 使用大模型进行意图分类
+ * 使用 LangChain v1 的 withStructuredOutput 进行意图分类
  */
 import { ChatOpenAI } from '@langchain/openai';
+import { z } from 'zod';
 import { buildIntentClassificationPrompt, FALLBACK_RULES } from '../prompts/intent-classification.js';
 import { IntentType, IntentResult } from '../types/intent.js';
 
 // 重新导出类型，方便其他模块使用
 export { IntentType, IntentResult };
 
+// 定义意图分类的 Zod Schema (用于 Structured Output)
+const IntentClassificationSchema = z.object({
+  type: z.enum([
+    'QUERY_DATABASE',
+    'MODIFY_FIELD',
+    'CREATE_COLLECTION',
+    'DELETE_COLLECTION',
+    'INSERT_DOCUMENT',
+    'DELETE_DOCUMENT',
+    'ANALYZE_DATA',
+    'DOC_QUESTION',
+    'GENERAL_CHAT',
+  ]).describe('意图类型'),
+  confidence: z.number().min(0).max(1).describe('置信度 0-1'),
+  params: z.record(z.any()).describe('提取的参数'),
+});
+
+// 从 Zod Schema 推断类型
+type IntentClassificationOutput = z.infer<typeof IntentClassificationSchema>;
+
 export class IntentClassifier {
   private llm: ChatOpenAI | null = null;
+  private structuredLLM: ReturnType<ChatOpenAI['withStructuredOutput']> | null = null;
 
   constructor() {
     // 懒加载，只在第一次使用时初始化
   }
 
-  private getLLM(): ChatOpenAI {
-    if (!this.llm) {
+  private getStructuredLLM() {
+    if (!this.structuredLLM) {
+      // 创建 LLM
       this.llm = new ChatOpenAI({
-        modelName: process.env.LLM_MODEL || 'qwen3-max',
+        modelName: process.env.LLM_MODEL || 'qwen-plus',
         temperature: 0.1,
         configuration: {
           baseURL: process.env.LLM_BASE_URL,
           apiKey: process.env.LLM_API_KEY,
         },
       });
+
+      // 🔥 LangChain v1 新特性：withStructuredOutput
+      // 绑定 Zod Schema，LLM 返回值自动是强类型
+      this.structuredLLM = this.llm.withStructuredOutput(IntentClassificationSchema);
     }
-    return this.llm;
+    return this.structuredLLM;
   }
 
   /**
-   * 分类用户意图
+   * 分类用户意图 - 使用 LangChain 的 withStructuredOutput
    */
   async classify(message: string, context?: any): Promise<IntentResult> {
-    // 使用统一的提示词构建函数
-    const prompt = buildIntentClassificationPrompt(message, context);
+    const promptText = buildIntentClassificationPrompt(message, context);
 
     console.log('[IntentClassifier] 开始分析:', { message, hasContext: !!context });
 
     try {
-      const llm = this.getLLM();
-      const response = await llm.invoke(prompt);
-      const result = this.parseResponse(response.content as string);
-      
+      const structuredLLM = this.getStructuredLLM();
+
+      // 🔥 直接调用，返回值自动是结构化的！
+      const output = await structuredLLM.invoke(promptText) as IntentClassificationOutput;
+
+      const classificationResult: IntentResult = {
+        type: output.type as IntentType,
+        confidence: output.confidence,
+        params: output.params,
+      };
+
       console.log('[IntentClassifier] 识别成功:', {
-        type: result.type,
-        params: result.params,
-        confidence: result.confidence
+        type: classificationResult.type,
+        params: classificationResult.params,
+        confidence: classificationResult.confidence,
       });
 
-      return result;
+      return classificationResult;
     } catch (error: any) {
       console.error('[IntentClassifier] LLM 调用失败，使用降级方案:', error.message);
       // 降级：使用简单的关键词匹配
       return this.fallbackClassify(message);
     }
   }
-
 
   private parseResponse(content: string): IntentResult {
     try {
