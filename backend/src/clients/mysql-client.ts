@@ -186,8 +186,34 @@ export class MySqlClient {
       columnNames = columns.map(col => col.name);
     }
 
-    // 解析数据行 (Items)
-    const rows = result.Items || [];
+    // 解析数据行 (Items 也是 JSON 字符串数组)
+    let rows: any[][] = [];
+    if (result.Items && Array.isArray(result.Items)) {
+      rows = result.Items.map((itemStr: any) => {
+        // 如果是字符串，需要解析 JSON
+        if (typeof itemStr === 'string') {
+          try {
+            const parsed = JSON.parse(itemStr);
+            // 如果解析结果是对象，转换为按 columns 顺序的数组
+            if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+              return columnNames.map(col => parsed[col]);
+            }
+            return parsed;
+          } catch {
+            return [itemStr]; // 解析失败，直接作为单列返回
+          }
+        }
+        // 如果已经是数组，直接返回
+        if (Array.isArray(itemStr)) {
+          return itemStr;
+        }
+        // 如果是对象，转换为按 columns 顺序的数组
+        if (typeof itemStr === 'object') {
+          return columnNames.map(col => itemStr[col]);
+        }
+        return [itemStr];
+      });
+    }
 
     // 如果有数据，返回查询结果
     if (columns.length > 0 || rows.length > 0) {

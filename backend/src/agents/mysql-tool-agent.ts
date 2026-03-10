@@ -75,9 +75,12 @@ export class MySQLToolAgent {
 
       console.log('[MySQLToolAgent] 执行请求:', { message, envId, hasCookie: !!cookie });
 
+      // 🔥 构建包含上下文的消息
+      const messageWithContext = this.buildMessageWithContext(message, context);
+
       // 使用新版 LangGraph API 调用 Agent
       const result = await this.agent.invoke({
-        messages: [new HumanMessage(message)],
+        messages: [new HumanMessage(messageWithContext)],
       });
 
       console.log('[MySQLToolAgent] 执行结果:', JSON.stringify(result, null, 2));
@@ -133,6 +136,60 @@ export class MySQLToolAgent {
   }
 
   /**
+   * 构建包含上下文的消息
+   * 将历史会话信息注入到用户消息中，帮助 AI 理解上下文
+   */
+  private buildMessageWithContext(message: string, context: any): string {
+    const contextParts: string[] = [];
+
+    // 添加上一次操作的表信息
+    if (context.lastTable) {
+      contextParts.push(`上一次操作的表: ${context.lastTable}`);
+    }
+
+    // 添加上一次查询信息
+    if (context.lastQuery) {
+      contextParts.push(`上一次用户查询: "${context.lastQuery}"`);
+    }
+
+    // 添加数据库类型信息
+    if (context.lastDbType) {
+      contextParts.push(`上一次数据库类型: ${context.lastDbType}`);
+    }
+
+    // 如果没有上下文，直接返回原消息
+    if (contextParts.length === 0) {
+      return message;
+    }
+
+    // 构建包含上下文的消息
+    const contextInfo = contextParts.join('\n');
+    return `【上下文信息】
+${contextInfo}
+
+【用户当前请求】
+${message}
+
+注意：如果用户的请求涉及到"这个表"、"刚才的表"、"表结构"等指代性表达，请使用上下文中提到的表名。`;
+  }
+
+  /**
+   * 从 AI 回复中提取表名
+   * AI 会在回复末尾附上 [[TABLE:表名]] 格式的标记
+   */
+  private extractTableNameFromResponse(output: string): { tableName: string; cleanOutput: string } {
+    const match = output.match(/\[\[TABLE:(\w+)\]\]/);
+    if (match) {
+      return {
+        tableName: match[1],
+        // 移除标记，返回干净的输出给用户
+        cleanOutput: output.replace(/\s*\[\[TABLE:\w+\]\]\s*/, '').trim(),
+      };
+    }
+    return { tableName: '', cleanOutput: output };
+  }
+
+  /**
    * 格式化响应
    */
   private formatResponse(result: any, context: any): AgentResponse {
@@ -142,6 +199,13 @@ export class MySQLToolAgent {
     let toolUsed = '';
     let tableName = '';
     let rowCount = 0;
+
+    // 🔥 从 AI 回复中提取表名（AI 会在末尾附上 [[TABLE:表名]]）
+    const { tableName: extractedTable, cleanOutput } = this.extractTableNameFromResponse(result.output || '');
+    if (extractedTable) {
+      tableName = extractedTable;
+      console.log(`[MySQLToolAgent] 从 AI 回复中提取表名: ${tableName}`);
+    }
 
     // 优先从缓存获取完整查询数据
     const cachedResult = getLastMySqlQueryResult();
@@ -161,7 +225,7 @@ export class MySQLToolAgent {
       clearLastMySqlQueryResult();
     }
 
-    // 解析中间步骤
+    // 解析中间步骤（获取工具执行结果）
     for (const step of intermediateSteps) {
       const toolName = step.action?.tool;
       const toolOutput = step.observation;
@@ -171,7 +235,7 @@ export class MySQLToolAgent {
           const parsed = JSON.parse(toolOutput);
           if (parsed.success) {
             toolUsed = toolUsed || toolName;
-            if (parsed.tableName) tableName = parsed.tableName;
+            if (parsed.tableName) tableName = tableName || parsed.tableName;
             if (parsed.tables) data = parsed.tables;
             if (parsed.affectedRows !== undefined) rowCount = parsed.affectedRows;
           }
@@ -191,9 +255,11 @@ export class MySQLToolAgent {
       toolUsed,
     };
 
+    console.log('[MySQLToolAgent] 最终 metadata:', metadata);
+
     return {
       type: data ? 'query_result' : 'tool_response',
-      message: result.output,
+      message: cleanOutput,  // 使用清理后的输出（不含 [[TABLE:xxx]]）
       data,
       metadata,
       suggestions: ['继续查询', '查看表结构', '导出数据'],

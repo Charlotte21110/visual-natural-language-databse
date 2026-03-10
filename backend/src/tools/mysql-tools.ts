@@ -75,10 +75,18 @@ export const runSqlTool = tool(
         { cookie: currentCookie, token: currentToken }
       );
 
-      // 判断是否是查询操作
-      const isQuery = cleanSql.toUpperCase().startsWith('SELECT');
+      // 判断是否是查询操作（返回数据的命令）
+      const upperSql = cleanSql.toUpperCase();
+      const isSelectQuery = upperSql.startsWith('SELECT');
+      const isStructureQuery = upperSql.startsWith('SHOW') ||
+                               upperSql.startsWith('DESC') ||
+                               upperSql.startsWith('DESCRIBE') ||
+                               upperSql.startsWith('EXPLAIN');
 
-      if (isQuery) {
+      // 🔥 如果有返回数据，也当作查询处理
+      const hasData = result.rows && result.rows.length > 0;
+
+      if (isSelectQuery || isStructureQuery || hasData) {
         const columnNames = result.columnNames || [];
         const rows = result.rows || [];
 
@@ -90,16 +98,17 @@ export const runSqlTool = tool(
           timestamp: Date.now(),
         };
 
-        // 只传前 N 条给大模型
-        const previewRows = rows.slice(0, PREVIEW_COUNT);
+        // 🔥 结构查询（DESCRIBE/SHOW）不截断，SELECT 查询才截断预览
+        const shouldTruncate = isSelectQuery && rows.length > PREVIEW_COUNT;
+        const previewRows = shouldTruncate ? rows.slice(0, PREVIEW_COUNT) : rows;
 
         return JSON.stringify({
           success: true,
-          type: 'query',
+          type: isStructureQuery ? 'structure' : 'query',
           totalCount: rows.length,
           columns: columnNames,
           preview: previewRows,
-          hint: rows.length > PREVIEW_COUNT
+          hint: shouldTruncate
             ? `共 ${rows.length} 条数据，已展示前 ${PREVIEW_COUNT} 条`
             : undefined,
         });

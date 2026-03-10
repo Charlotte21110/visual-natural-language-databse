@@ -60,8 +60,10 @@ export class ContextManager {
     if (history.length > 0) {
       const lastEntry = history[history.length - 1];
       enriched.lastQuery = lastEntry.message;
-      enriched.lastTable = lastEntry.intent?.params?.table;
-      enriched.lastDbType = lastEntry.intent?.params?.dbType;
+      // 🔥 优先从 result.metadata.table 中获取（Agent 执行后的结果更准确）
+      // 其次从 intent.params.table 中获取
+      enriched.lastTable = lastEntry.result?.metadata?.table || lastEntry.intent?.params?.table;
+      enriched.lastDbType = lastEntry.result?.metadata?.dbType || lastEntry.intent?.params?.dbType;
     }
 
     return enriched;
