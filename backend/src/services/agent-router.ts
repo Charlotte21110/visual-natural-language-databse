@@ -9,9 +9,9 @@
  *
  * 🔥 全部使用 LangChain v1 新 API
  */
-import { ChatOpenAI } from '@langchain/openai';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { IntentType, IntentResult } from '../types/intent.js';
+import { chat as codeBuddyChat } from './codebuddy-llm.js';
+import { IntentType } from '../types/intent.js';
+import type { IntentResult } from '../types/intent.js';
 import { DataExplorerAgent } from '../agents/data-explorer-agent.js';
 import { DocAssistantAgent } from '../agents/doc-assistant-agent.js';
 import { FieldMutatorAgent } from '../agents/field-mutator-agent.js';
@@ -40,8 +40,6 @@ export class AgentRouter {
   private documentManagerAgent: DocumentManagerAgent;
   private toolAgent: ToolAgent;
   private mysqlToolAgent: MySQLToolAgent;
-  private llm: ChatOpenAI | null = null;
-
   constructor() {
     this.dataExplorerAgent = new DataExplorerAgent();
     this.docAssistantAgent = new DocAssistantAgent();
@@ -54,39 +52,17 @@ export class AgentRouter {
     console.log('[AgentRouter] MySQL Agent 模式:', USE_MYSQL_AGENT ? '已启用' : '已禁用');
   }
 
-  private getLLM() {
-    if (!this.llm) {
-      // 🔥 LangChain v1 新写法：ChatOpenAI
-      this.llm = new ChatOpenAI({
-        modelName: process.env.LLM_MODEL || 'qwen3-max',
-        temperature: 0.7,
-        configuration: {
-          baseURL: process.env.LLM_BASE_URL,
-          apiKey: process.env.LLM_API_KEY,
-        },
-      });
-    }
-    return this.llm;
-  }
-
   /**
-   * 处理普通对话（使用 LangChain ChatOpenAI）
+   * 处理普通对话（使用 CodeBuddy LLM）
    */
   private async handleGeneralChat(message: string, context: any): Promise<AgentResponse> {
     try {
       const promptText = buildGeneralChatPrompt(message, context);
-      const llm = this.getLLM();
 
-      // 🔥 LangChain v1：使用 messages 数组
-      const response = await llm.invoke([
-        new SystemMessage('你是 Natural Language DB 助手，专门帮助用户查询数据库、分析数据、回答问题。回复要简洁友好。'),
-        new HumanMessage(promptText),
+      const content = await codeBuddyChat([
+        { role: 'system', content: '你是 Natural Language DB 助手，专门帮助用户查询数据库、分析数据、回答问题。回复要简洁友好。' },
+        { role: 'user', content: promptText },
       ]);
-
-      // 提取回复内容
-      const content = typeof response.content === 'string'
-        ? response.content
-        : JSON.stringify(response.content);
 
       return {
         type: 'general_chat',
@@ -95,7 +71,6 @@ export class AgentRouter {
       };
     } catch (error: any) {
       console.error('[Agent Router] General chat error:', error);
-      // 降级：返回固定回复
       return {
         type: 'general_chat',
         message: '你好！我是 Natural Language DB 助手。我可以帮你查询数据库、分析数据、回答文档问题。请告诉我你想做什么？',

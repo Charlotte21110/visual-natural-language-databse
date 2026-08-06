@@ -5,28 +5,13 @@
  * 使用场景：当 ToolAgent 找不到合适的工具时，降级到这里
  * 流程：RAG 检索文档 → LLM 生成代码 → 安全执行
  */
-import { ChatOpenAI } from '@langchain/openai';
+import { generateText } from '../services/codebuddy-llm.js';
 import { getRAGService } from '../services/rag-service.js';
 import { getCloudBaseClient } from '../clients/cloudbase-client.js';
 import { AgentResponse } from '../services/agent-router.js';
 import { CODE_GENERATION_PROMPT } from '../prompts/rag-code-agent.js';
 
 export class RAGCodeAgent {
-  private llm: ChatOpenAI | null = null;
-
-  private getLLM(): ChatOpenAI {
-    if (!this.llm) {
-      this.llm = new ChatOpenAI({
-        modelName: process.env.LLM_MODEL || 'qwen-plus',
-        temperature: 0.1, // 低温度，生成更确定的代码
-        configuration: {
-          baseURL: process.env.LLM_BASE_URL,
-          apiKey: process.env.LLM_API_KEY,
-        },
-      });
-    }
-    return this.llm;
-  }
 
   /**
    * 执行用户请求
@@ -35,56 +20,50 @@ export class RAGCodeAgent {
     console.log('[RAGCodeAgent] 开始处理:', message);
 
     try {
-      // 1. RAG 检索相关文档
-      const ragService = getRAGService();
-      const docs = await ragService.retrieve(message, 5);
-      
-      if (docs.length === 0) {
-        return {
-          type: 'error',
-          message: '抱歉，没有找到相关的 API 文档，无法生成代码。',
-          suggestions: ['查看文档', '尝试其他操作'],
-        };
+      // 尝试 RAG 检索
+      let docs: any[] = [];
+      try {
+        const ragService = getRAGService();
+        docs = await ragService.retrieve(message, 5);
+      } catch (ragError: any) {
+        console.log('[RAGCodeAgent] RAG 服务不可用，直接使用 LLM:', ragError.message);
       }
 
-      console.log('[RAGCodeAgent] 检索到', docs.length, '个相关文档');
+      if (docs.length > 0) {
+        // 有 RAG 文档，走代码生成路径
+        const docContext = docs.map((d, i) => 
+          `[文档${i + 1}] ${d.source}\n${d.content}`
+        ).join('\n\n---\n\n');
 
-      // 2. 构建上下文
-      const docContext = docs.map((d, i) => 
-        `[文档${i + 1}] ${d.source}\n${d.content}`
-      ).join('\n\n---\n\n');
+        const prompt = CODE_GENERATION_PROMPT
+          .replace('{context}', docContext)
+          .replace('{query}', message);
 
-      // 3. 生成代码
-      const prompt = CODE_GENERATION_PROMPT
-        .replace('{context}', docContext)
-        .replace('{query}', message);
+        const response = await generateText(prompt);
+        const generatedCode = this.extractCode(response);
 
-      const llm = this.getLLM();
-      const response = await llm.invoke(prompt);
-      const generatedCode = this.extractCode(response.content as string);
-
-      if (!generatedCode) {
-        return {
-          type: 'error',
-          message: '代码生成失败，请尝试更明确地描述您的需求。',
-          suggestions: ['查询 test 表', '添加一条数据'],
-        };
+        if (generatedCode) {
+          console.log('[RAGCodeAgent] 生成的代码:\n', generatedCode);
+          const result = await this.executeCode(generatedCode, context);
+          return {
+            type: 'rag_code_result',
+            message: `✅ 操作成功！\n\n**生成的代码：**\n\`\`\`javascript\n${generatedCode}\n\`\`\``,
+            data: result.data,
+            metadata: { generatedCode, sources: docs.slice(0, 3).map(d => d.source) },
+            suggestions: ['继续操作', '查询数据'],
+          };
+        }
       }
 
-      console.log('[RAGCodeAgent] 生成的代码:\n', generatedCode);
-
-      // 4. 执行代码
-      const result = await this.executeCode(generatedCode, context);
+      // 无 RAG 或代码生成失败，直接用 LLM 回答
+      const envId = context.envId || process.env.TCB_ENV_ID || '未配置';
+      const directPrompt = `你是一个数据库操作助手。用户想在 CloudBase 环境 (envId: ${envId}) 上执行以下操作：\n\n${message}\n\n请给出操作建议和可能的实现方案。`;
+      const directResponse = await generateText(directPrompt);
 
       return {
-        type: 'rag_code_result',
-        message: `✅ 操作成功！\n\n**生成的代码：**\n\`\`\`javascript\n${generatedCode}\n\`\`\``,
-        data: result.data,
-        metadata: {
-          generatedCode,
-          sources: docs.slice(0, 3).map(d => d.source),
-        },
-        suggestions: ['继续操作', '查询数据'],
+        type: 'tool_response',
+        message: directResponse,
+        suggestions: ['继续操作', '查看文档'],
       };
     } catch (error: any) {
       console.error('[RAGCodeAgent] 执行失败:', error);
