@@ -4,6 +4,7 @@
  */
 import { ChatOpenAI } from '@langchain/openai';
 import { z } from 'zod';
+import { createChatModel } from '../config/llm.js';
 import { buildIntentClassificationPrompt, FALLBACK_RULES } from '../prompts/intent-classification.js';
 import { IntentType, IntentResult } from '../types/intent.js';
 
@@ -41,14 +42,7 @@ export class IntentClassifier {
   private getStructuredLLM() {
     if (!this.structuredLLM) {
       // 创建 LLM
-      this.llm = new ChatOpenAI({
-        modelName: process.env.LLM_MODEL || 'qwen-plus',
-        temperature: 0.1,
-        configuration: {
-          baseURL: process.env.LLM_BASE_URL,
-          apiKey: process.env.LLM_API_KEY,
-        },
-      });
+      this.llm = createChatModel({ temperature: 0.1 });
 
       // 🔥 LangChain v1 新特性：withStructuredOutput
       // 绑定 Zod Schema，LLM 返回值自动是强类型

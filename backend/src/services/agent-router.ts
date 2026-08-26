@@ -11,6 +11,7 @@
  */
 import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { createChatModel } from '../config/llm.js';
 import { IntentType, IntentResult } from '../types/intent.js';
 import { DataExplorerAgent } from '../agents/data-explorer-agent.js';
 import { DocAssistantAgent } from '../agents/doc-assistant-agent.js';
@@ -57,14 +58,7 @@ export class AgentRouter {
   private getLLM() {
     if (!this.llm) {
       // 🔥 LangChain v1 新写法：ChatOpenAI
-      this.llm = new ChatOpenAI({
-        modelName: process.env.LLM_MODEL || 'qwen3-max',
-        temperature: 0.7,
-        configuration: {
-          baseURL: process.env.LLM_BASE_URL,
-          apiKey: process.env.LLM_API_KEY,
-        },
-      });
+      this.llm = createChatModel({ temperature: 0.7 });
     }
     return this.llm;
   }

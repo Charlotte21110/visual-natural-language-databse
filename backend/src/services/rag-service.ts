@@ -3,6 +3,7 @@
  * 使用本地 JSON 文件持久化向量索引，避免每次重启都重新计算 embedding
  */
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
+import { createChatModel, createEmbeddings } from '../config/llm.js';
 import { MemoryVectorStore } from '@langchain/classic/vectorstores/memory';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { Document } from '@langchain/core/documents';
@@ -48,23 +49,9 @@ export class RAGService {
     if (this.initialized) return;
     console.log('[RAGService] 开始初始化...');
 
-    this.embeddings = new OpenAIEmbeddings({
-      modelName: process.env.EMBEDDING_MODEL || 'text-embedding-v3',
-      openAIApiKey: process.env.LLM_API_KEY,
-      batchSize: 10, // 阿里百炼 API 限制每批最多 10 条
-      configuration: {
-        baseURL: process.env.LLM_BASE_URL,
-      },
-    });
+    this.embeddings = createEmbeddings();
 
-    this.llm = new ChatOpenAI({
-      modelName: process.env.LLM_MODEL || 'qwen-plus',
-      temperature: 0.3,
-      configuration: {
-        baseURL: process.env.LLM_BASE_URL,
-        apiKey: process.env.LLM_API_KEY,
-      },
-    });
+    this.llm = createChatModel({ temperature: 0.3 });
 
     await this.loadAndIndexDocuments();
     this.initialized = true;

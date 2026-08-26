@@ -9,6 +9,7 @@
  * 4. 找不到工具时降级到 RAG 代码生成
  */
 import { ChatOpenAI } from '@langchain/openai';
+import { createChatModel } from '../config/llm.js';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { HumanMessage, AIMessage, ToolMessage } from '@langchain/core/messages';
 import { mysqlTools, getLastMySqlQueryResult, clearLastMySqlQueryResult, setMySqlEnvId, setMySqlAuth } from '../tools/mysql-tools.js';
@@ -30,14 +31,7 @@ export class MySQLToolAgent {
   private async initialize() {
     if (this.initialized) return;
 
-    this.llm = new ChatOpenAI({
-      modelName: process.env.LLM_MODEL || 'qwen-plus',
-      temperature: 0.1,
-      configuration: {
-        baseURL: process.env.LLM_BASE_URL,
-        apiKey: process.env.LLM_API_KEY,
-      },
-    });
+    this.llm = createChatModel({ temperature: 0.1 });
 
     // 使用新版 LangGraph createReactAgent（直接返回可调用的 graph）
     this.agent = createReactAgent({

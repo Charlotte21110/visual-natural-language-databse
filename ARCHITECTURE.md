@@ -1,406 +1,143 @@
-# Natural Language DB - 架构设计文档
+# 架构
 
-## 📐 整体架构
-
-### 1. 前后端分离架构
+## 整体结构
 
 ```
-┌───────────────────────────────────────────────────────┐
-│                 Frontend (React + Vite)                │
-│  ┌─────────────────────────────────────────────────┐  │
-│  │  UI Layer                                        │  │
-│  │  - ChatArea (对话界面)                           │  │
-│  │  - QueryResult (结果展示)                        │  │
-│  │  - Sidebar (数据库导航)                          │  │
-│  └─────────────────────────────────────────────────┘  │
-│  ┌─────────────────────────────────────────────────┐  │
-│  │  Request Layer                                   │  │
-│  │  - capi-request.ts (调用 CAPI)                   │  │
-│  │  - lcap-request.ts (调用 LCAP)                   │  │
-│  │  - api-client.ts (调用后端 API) [新增]          │  │
-│  └─────────────────────────────────────────────────┘  │
-└────────────────────┬──────────────────────────────────┘
-                     │
-                     │ HTTP/HTTPS
-                     │
-┌────────────────────┴──────────────────────────────────┐
-│            Backend (Node.js + Express)                 │
-│  ┌─────────────────────────────────────────────────┐  │
-│  │  Router Layer                                    │  │
-│  │  - /api/chat/query (业务接口)                    │  │
-│  │  - /api/weda/* (Weda 代理) [可选]                │  │
-│  └─────────────────────────────────────────────────┘  │
-│  ┌─────────────────────────────────────────────────┐  │
-│  │  Intelligence Layer (LangChain.js)               │  │
-│  │  - IntentClassifier (意图分类)                   │  │
-│  │  - AgentRouter (Agent 路由)                      │  │
-│  │  - ContextManager (上下文管理)                   │  │
-│  └─────────────────────────────────────────────────┘  │
-│  ┌─────────────────────────────────────────────────┐  │
-│  │  Agent Layer                                     │  │
-│  │  - DataExplorerAgent (查询)                      │  │
-│  │  - DocAssistantAgent (文档问答)                  │  │
-│  │  - FieldMutatorAgent (字段修改)                  │  │
-│  │  - SchemaDesignerAgent (表结构)                  │  │
-│  │  - DataAnalyzerAgent (数据分析)                  │  │
-│  └─────────────────────────────────────────────────┘  │
-│  ┌─────────────────────────────────────────────────┐  │
-│  │  Client Layer                                    │  │
-│  │  - CloudBaseClient (CloudBase SDK)               │  │
-│  │  - RAGService (ChromaDB + 向量检索)              │  │
-│  └─────────────────────────────────────────────────┘  │
-└───────────────────────────────────────────────────────┘
+浏览器 (React)
+  │
+  │ POST /api/chat/query
+  │
+Express 后端
+  │
+  ├─ IntentClassifier ── LLM 判断用户想干嘛，输出结构化意图
+  │
+  ├─ AgentRouter ─────── 根据意图类型把请求扔给对应的 Agent
+  │
+  ├─ Agents
+  │   ├─ ToolAgent ────── FlexDB 操作（ReAct + Function Calling）
+  │   ├─ MySQLToolAgent ─ MySQL 操作（ReAct + Function Calling）
+  │   ├─ RAGCodeAgent ─── 降级方案：RAG 检索文档 → 生成代码 → 执行
+  │   ├─ DataExplorerAgent  FlexDB 查询（参数驱动，不走 Function Calling）
+  │   ├─ DocAssistantAgent  文档问答
+  │   ├─ FieldMutatorAgent  字段修改
+  │   └─ DocumentManagerAgent 文档增删
+  │
+  └─ Clients
+      ├─ CloudBase SDK ── 操作 FlexDB
+      ├─ MySQL Client ─── 操作 MySQL（通过腾讯云 CAPI）
+      └─ ChromaDB ─────── 向量检索（RAG 用）
 ```
 
-## 🔄 请求流程设计
+## 请求怎么走的
 
-### 场景 1: 查询数据库
-
-```
-用户输入: "查询 flexdb 的 users 表"
-
-1. [前端] ChatArea 组件
-   ├─ 用户输入验证
-   ├─ 添加消息到对话历史
-   └─ 调用 API: POST /api/chat/query
-        {
-          "message": "查询 flexdb 的 users 表",
-          "context": {
-            "envId": "xxx",
-            "sessionId": "user-123"
-          }
-        }
-
-2. [后端] ChatController.handleChatQuery()
-   ├─ ContextManager.enrichContext()
-   │   ├─ 补充默认 envId
-   │   ├─ 获取历史对话（最近 5 条）
-   │   └─ 提取上下文信息（上次查询的表、数据库类型）
-   │
-   ├─ IntentClassifier.classify()
-   │   ├─ 构建 Prompt
-   │   ├─ 调用 LLM（通义千问/DeepSeek）
-   │   └─ 解析意图 JSON
-   │        {
-   │          "type": "QUERY_DATABASE",
-   │          "confidence": 0.95,
-   │          "params": {
-   │            "dbType": "flexdb",
-   │            "table": "users"
-   │          }
-   │        }
-   │
-   ├─ AgentRouter.route()
-   │   └─ 根据意图 type 路由到 DataExplorerAgent
-   │
-   └─ DataExplorerAgent.execute()
-       ├─ 参数补全和验证
-       │   ├─ 检查 envId
-       │   ├─ 检查 table
-       │   └─ 补充默认 dbType
-       │
-       ├─ CloudBaseClient.queryCollection()
-       │   ├─ 构建查询参数
-       │   ├─ 调用 @tcb-manager/node
-       │   └─ 返回数据
-       │
-       └─ 格式化响应
-            {
-              "type": "query_result",
-              "message": "已为您查询 FlexDB 的 users 表，共 120 条数据",
-              "data": [...],
-              "metadata": {
-                "dbType": "flexdb",
-                "table": "users",
-                "rowCount": 120,
-                "columns": ["id", "name", "email"],
-                "displayType": "document"
-              },
-              "suggestions": ["筛选数据", "分析这些数据"]
-            }
-
-3. [前端] 处理响应
-   ├─ 添加 AI 消息到对话历史
-   ├─ 更新 QueryResult 组件
-   │   ├─ 如果是 FlexDB: 显示文档型视图（树形）
-   │   └─ 如果是 MySQL: 显示表格型视图
-   │
-   └─ 显示 suggestions（快捷操作按钮）
-```
-
-### 场景 2: 文档问答
+以"查一下 users 表"为例：
 
 ```
-用户输入: "如何连接 MongoDB"
+1. 前端发 POST /api/chat/query
+   body: { message: "查一下 users 表", context: { envId: "xxx" } }
 
-1. [前端] POST /api/chat/query
+2. ChatController 收到请求
+   → ContextManager 补全上下文（上次查的表、数据库类型等）
+   → IntentClassifier 分析意图
 
-2. [后端]
-   ├─ IntentClassifier -> "DOC_QUESTION"
-   ├─ AgentRouter -> DocAssistantAgent
-   └─ DocAssistantAgent.execute()
-       ├─ RAGService.search()
-       │   ├─ 向量化用户问题
-       │   ├─ ChromaDB 检索相关文档片段
-       │   └─ 返回 Top 3 相关片段
-       │
-       ├─ LLM 生成回答
-       │   ├─ 输入: 问题 + 文档片段
-       │   └─ 输出: 带引用的回答
-       │
-       └─ 格式化响应
-            {
-              "type": "doc_answer",
-              "message": "要连接 MongoDB，需要...",
-              "metadata": {
-                "sources": [
-                  { "title": "MongoDB 连接指南", "snippet": "..." }
-                ]
-              }
-            }
+3. IntentClassifier（LLM + Zod Schema 结构化输出）
+   输入: "查一下 users 表"
+   输出: { type: "QUERY_DATABASE", confidence: 0.95, params: { table: "users", dbType: "flexdb" } }
 
-3. [前端] 显示回答 + 引用来源
+4. AgentRouter 根据 type 路由
+   QUERY_DATABASE + flexdb → ToolAgent
+   QUERY_DATABASE + mysql  → MySQLToolAgent
+   DOC_QUESTION            → DocAssistantAgent
+   GENERAL_CHAT            → 直接调 LLM 回复
+
+5. ToolAgent 执行（核心链路）
+   → createReactAgent 启动 ReAct 循环
+   → LLM 看到可用工具列表，决定调 query_collection
+   → 自动生成参数 { collection: "users", limit: 20 }
+   → 执行工具，拿到数据
+   → LLM 看到数据，生成最终回复
+   → 如果没找到合适工具，降级到 RAGCodeAgent
+
+6. 返回给前端
+   { type: "query_result", message: "查到 20 条数据", data: [...], metadata: { ... } }
 ```
 
-## 🧩 关键设计决策
+## 关键组件
 
-### 1. 为什么要有 IntentClassifier？
+### IntentClassifier
 
-**问题**: 用户输入千变万化，如何知道要做什么？
+用 LLM 把自然语言转成结构化意图。用了 LangChain 的 `withStructuredOutput`，绑定 Zod Schema，模型直接输出类型安全的 JSON，不用手动解析。
 
-**解决方案**:
-- 使用 LLM 进行意图分类
-- 输出结构化 JSON（意图类型 + 参数）
-- 降级方案：关键词匹配（无 LLM 时）
+降级方案：LLM 挂了就走关键词正则匹配（`fallbackClassify`）。
 
-**好处**:
-- 统一的决策入口
-- 易于扩展新意图
-- 可以记录意图识别准确率
+### ToolAgent / MySQLToolAgent
 
-### 2. 为什么要有 AgentRouter？
+核心的 Function Calling Agent。用 LangGraph 的 `createReactAgent`，把一组 tool 交给 LLM，LLM 自己决定：
+- 调哪个工具
+- 传什么参数
+- 要不要连续调多个工具
 
-**问题**: 不同的任务需要不同的处理逻辑
+这和手写 if-else 路由的区别是：加新功能只要加一个 tool 定义，不用改任何路由逻辑。
 
-**解决方案**:
-- 根据意图类型路由到专门的 Agent
-- 每个 Agent 专注于一个领域（查询、修改、分析）
+### RAGCodeAgent
 
-**好处**:
-- 职责分离，代码清晰
-- 易于添加新 Agent
-- 可以独立测试每个 Agent
+当 ToolAgent 找不到合适工具时的降级方案。流程：
+1. 用 ChromaDB 检索和用户问题相关的 API 文档
+2. 把文档片段 + 用户问题交给 LLM 生成 SDK 调用代码
+3. 执行生成的代码，返回结果
 
-### 3. 为什么要有 ContextManager？
+### AgentRouter
 
-**问题**: 用户可能说"再查一下刚才那个表"
+一个 switch-case，根据意图类型分发请求。同时管两个开关：
+- `USE_TOOL_AGENT`：是否启用 Function Calling（关掉后 FlexDB 走参数驱动的 DataExplorerAgent）
+- `USE_MYSQL_AGENT`：是否启用 MySQL Agent
 
-**解决方案**:
-- 记录会话历史
-- 补全上下文信息（envId、上次查询的表）
-- 支持指代消解
+### ContextManager
 
-**好处**:
-- 更自然的对话体验
-- 减少用户重复输入
-- 支持连续多轮对话
+记住对话历史，支持"刚才那个表"这种指代。把上次操作的表名、数据库类型注入到当前请求的上下文里。
 
-## 🔌 前端对接方式
+## 工具定义（Function Calling 用的）
 
-### 方案 1: 直接调用后端 API（推荐）
+### FlexDB 工具（database-tools.ts）
 
-```typescript
-// frontend/src/api/chat-api.ts
-export async function queryChatAPI(message: string, context?: any) {
-  const response = await fetch('http://localhost:3001/api/chat/query', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, context }),
-  });
-  return response.json();
-}
+给 ToolAgent 用的，大模型从这里面选：
 
-// frontend/src/components/ChatArea/index.tsx
-import { queryChatAPI } from '@/api/chat-api';
+- `query_collection` — 查询集合数据
+- `list_collections` — 列出所有集合
+- `insert_document` — 插入文档
+- `update_document` — 更新文档
+- `get_collection_schema` — 获取集合结构
 
-const handleSend = async () => {
-  const result = await queryChatAPI(inputValue, {
-    envId: 'your-env-id',
-    sessionId: 'default',
-  });
-  
-  // 处理响应
-  setMessages(prev => [...prev, { type: 'ai', content: result.message }]);
-  onQuery?.(result); // 更新右侧数据展示
-};
+### MySQL 工具（mysql-tools.ts）
+
+给 MySQLToolAgent 用的：
+
+- `list_tables` — 列出所有表
+- `run_sql` — 执行 SQL 语句
+- `describe_table` — 查看表结构
+
+## 前端怎么接的
+
+前端通过 `POST /api/chat/query` 和后端通信。根据返回的 `type` 字段决定怎么展示：
+
+- `query_result` → 表格视图（MySQL）或文档视图（FlexDB）
+- `doc_answer` → Markdown 渲染 + 引用来源
+- `error` → 错误提示
+- `general_chat` → 普通对话气泡
+
+## .env 配置
+
+```env
+# 大模型（OpenAI 兼容协议，千问/DeepSeek 都能用）
+LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+LLM_API_KEY=sk-xxx
+LLM_MODEL=qwen-max
+
+# ChromaDB（RAG 用）
+CHROMA_HOST=localhost
+CHROMA_PORT=8000
+
+# Agent 开关
+USE_TOOL_AGENT=true     # true=Function Calling, false=参数驱动
+USE_MYSQL_AGENT=true
 ```
-
-### 方案 2: 同时调用本地接口和 Weda 接口
-
-**问题**: 
-- 有些功能需要调用后端 AI 处理（`/api/chat/query`）
-- 有些功能需要直接调用 Weda CAPI（`/weda-capi`）
-
-**解决方案**:
-
-```typescript
-// frontend/src/request/index.ts
-export { capiRequest, lcapRequest } from './capi-request';
-export { queryChatAPI } from './chat-api'; // 新增
-
-// 使用场景判断
-if (needAIProcessing) {
-  // 调用后端 AI
-  const result = await queryChatAPI(message);
-} else {
-  // 直接调用 CAPI
-  const result = await flexdbCapiRequest({ action: 'Query', data: {...} });
-}
-```
-
-**判断标准**:
-- 自然语言输入 → 调用后端 AI
-- 明确的 SDK 调用 → 直接调用 CAPI
-- 文档问答 → 调用后端 AI
-- 数据模型创建 → 直接调用 CAPI（或通过后端包装）
-
-## 🎯 响应格式规范
-
-### 统一响应结构
-
-```typescript
-interface AgentResponse {
-  type: 'query_result' | 'doc_answer' | 'error' | 'missing_params' | ...;
-  message: string;           // 给用户的回复消息
-  data?: any;                // 查询结果数据
-  metadata?: {               // 元数据
-    dbType?: string;
-    table?: string;
-    rowCount?: number;
-    columns?: string[];
-    displayType?: 'table' | 'document';
-    [key: string]: any;
-  };
-  suggestions?: string[];    // 下一步建议
-}
-```
-
-### 前端根据 type 渲染
-
-```typescript
-// frontend/src/components/QueryResult/index.tsx
-switch (response.type) {
-  case 'query_result':
-    if (response.metadata.displayType === 'document') {
-      return <DocumentView data={response.data} />;
-    } else {
-      return <TableView data={response.data} columns={response.metadata.columns} />;
-    }
-  
-  case 'doc_answer':
-    return <DocAnswerView message={response.message} sources={response.metadata.sources} />;
-  
-  case 'error':
-    return <ErrorView message={response.message} />;
-  
-  case 'missing_params':
-    return <ParamForm message={response.message} suggestions={response.suggestions} />;
-}
-```
-
-## 🚀 部署方案
-
-### 开发环境
-
-```bash
-# 终端 1: 启动前端
-cd frontend
-npm run dev
-# → http://localhost:5173
-
-# 终端 2: 启动后端
-cd backend
-npm run dev
-# → http://localhost:3001
-```
-
-### 生产环境
-
-```
-┌─────────────────────────────────────┐
-│          Nginx / CDN                 │
-│  ├─ /api/* → 转发到后端              │
-│  └─ /* → 静态资源（前端构建产物）    │
-└─────────────────────────────────────┘
-         │
-         ├─→ Node.js Backend (PM2)
-         │    └─ http://localhost:3001
-         │
-         └─→ Static Files (React Build)
-              └─ /dist
-```
-
-**部署步骤**:
-
-```bash
-# 1. 构建前端
-cd frontend
-npm run build
-# → 产物在 frontend/dist
-
-# 2. 构建后端
-cd backend
-npm run build
-# → 产物在 backend/dist
-
-# 3. 启动后端
-cd backend
-pm2 start dist/index.js --name nldb-backend
-
-# 4. 配置 Nginx
-server {
-  listen 80;
-  
-  location /api {
-    proxy_pass http://localhost:3001;
-  }
-  
-  location / {
-    root /path/to/frontend/dist;
-    try_files $uri $uri/ /index.html;
-  }
-}
-```
-
-## 📊 后续优化方向
-
-### 性能优化
-- [ ] LLM 响应缓存（相同问题直接返回）
-- [ ] 查询结果分页（避免一次返回太多数据）
-- [ ] 流式返回（SSE/WebSocket）
-
-### 功能增强
-- [ ] RAG 文档问答
-- [ ] 多表 JOIN 查询
-- [ ] 数据可视化（ECharts）
-- [ ] SQL 执行计划分析
-
-### 安全增强
-- [ ] SQL 白名单验证
-- [ ] 权限隔离
-- [ ] 操作审计日志
-- [ ] 敏感操作二次确认
-
-## 💡 总结
-
-**核心设计理念**:
-1. **前后端分离**: 前端专注 UI，后端专注智能决策
-2. **模块化**: IntentClassifier、AgentRouter、各种 Agent 职责明确
-3. **可扩展**: 新增 Agent、新增意图都很容易
-4. **用户友好**: 自然语言输入 + 结构化输出
-
-**适合你的项目**:
-- ✅ 支持自然语言查询数据库
-- ✅ 支持直接调用 CAPI/LCAP（保留现有能力）
-- ✅ 易于扩展（RAG、多 Agent、数据分析）
-- ✅ 前后端解耦，方便部署

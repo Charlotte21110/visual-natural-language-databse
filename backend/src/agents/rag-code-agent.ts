@@ -6,6 +6,7 @@
  * 流程：RAG 检索文档 → LLM 生成代码 → 安全执行
  */
 import { ChatOpenAI } from '@langchain/openai';
+import { createChatModel } from '../config/llm.js';
 import { getRAGService } from '../services/rag-service.js';
 import { getCloudBaseClient } from '../clients/cloudbase-client.js';
 import { AgentResponse } from '../services/agent-router.js';
@@ -16,14 +17,7 @@ export class RAGCodeAgent {
 
   private getLLM(): ChatOpenAI {
     if (!this.llm) {
-      this.llm = new ChatOpenAI({
-        modelName: process.env.LLM_MODEL || 'qwen-plus',
-        temperature: 0.1, // 低温度，生成更确定的代码
-        configuration: {
-          baseURL: process.env.LLM_BASE_URL,
-          apiKey: process.env.LLM_API_KEY,
-        },
-      });
+      this.llm = createChatModel({ temperature: 0.1 }); // 低温度，生成更确定的代码
     }
     return this.llm;
   }
