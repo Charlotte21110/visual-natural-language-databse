@@ -13,8 +13,16 @@ export const LLM_CONFIG = {
   apiKey: process.env.LLM_API_KEY || '',
   /** 对话/生成模型 */
   model: process.env.LLM_MODEL || 'qwen3-max',
-  /** 向量模型（Embedding），用于 RAG 文档检索 */
-  embeddingModel: process.env.EMBEDDING_MODEL || 'text-embedding-v3',
+};
+
+/**
+ * 向量模型（Embedding）独立配置，用于 RAG 文档检索。
+ * 
+ */
+export const EMBEDDING_CONFIG = {
+  baseURL: process.env.VECTOR_MODEL_URL || 'https://api.siliconflow.cn/v1',
+  apiKey: process.env.VECTOR_MODEL_KEY || '',
+  model: process.env.VECTOR_MODEL || 'BAAI/bge-m3',
 };
 
 export interface CreateChatModelOptions {
@@ -39,14 +47,15 @@ export function createChatModel(options: CreateChatModelOptions = {}): ChatOpenA
 
 /**
  * 创建一个 OpenAIEmbeddings 实例（向量模型，用于 RAG）
+ * 走独立的向量模型配置（硅基流动）
  */
 export function createEmbeddings(): OpenAIEmbeddings {
   return new OpenAIEmbeddings({
-    modelName: LLM_CONFIG.embeddingModel,
-    openAIApiKey: LLM_CONFIG.apiKey,
+    modelName: EMBEDDING_CONFIG.model,
+    openAIApiKey: EMBEDDING_CONFIG.apiKey,
     batchSize: 10,
     configuration: {
-      baseURL: LLM_CONFIG.baseURL,
+      baseURL: EMBEDDING_CONFIG.baseURL,
     },
   });
 }
